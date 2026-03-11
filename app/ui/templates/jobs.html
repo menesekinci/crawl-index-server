@@ -1,48 +1,91 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="stack">
-  <div class="title-row">
+<div class="space-y-6">
+  <div class="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 pb-4">
     <div>
-      <h1>Jobs</h1>
-      <p class="muted">Track crawl submission, polling, and completion state.</p>
+      <h1 class="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Jobs</h1>
+      <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Monitor crawl activity, processing state, and completion status.</p>
     </div>
   </div>
-  <section class="panel">
-    <table>
-      <thead>
-        <tr>
-          <th>Job</th>
-          <th>Source</th>
-          <th>Status</th>
-          <th>Provider job</th>
-          <th>Progress</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for job in jobs %}
-        <tr>
-          <td>{{ job.id }}</td>
-          <td>{{ job.source_id }}</td>
-          <td>{{ job.status }}</td>
-          <td>{{ job.provider_job_id or '-' }}</td>
-          <td>{{ job.finished_records }}/{{ job.total_records }} ({{ job.skipped_records }} skipped)</td>
-          <td>
-            {% if job.status == 'failed' %}
-            <form method="post" action="/admin/jobs/{{ job.id }}/retry">
-              <button class="secondary" type="submit">Retry</button>
-            </form>
-            {% else %}
-            -
-            {% endif %}
-          </td>
-        </tr>
-        {% else %}
-        <tr><td colspan="6">No jobs found.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </section>
+
+  <div class="bg-white dark:bg-gray-950 shadow-sm ring-1 ring-gray-900/5 dark:ring-white/10 rounded-xl overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-200 dark:divide-white/10">
+        <thead class="bg-gray-50 dark:bg-white/[0.02]">
+          <tr>
+            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-xs font-semibold text-gray-900 dark:text-gray-200 sm:pl-6">Job ID / Target</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold text-gray-900 dark:text-gray-200">Status</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold text-gray-900 dark:text-gray-200">Provider ID</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold text-gray-900 dark:text-gray-200">Progress</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold text-gray-900 dark:text-gray-200">Action</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 dark:divide-white/10 bg-white dark:bg-transparent">
+          {% for job in jobs %}
+          <tr class="hover:bg-gray-50/50 dark:hover:bg-white/[0.02] transition-colors">
+            <td class="whitespace-nowrap py-4 pl-4 pr-3 sm:pl-6">
+              <div class="flex flex-col">
+                <span class="text-sm font-medium text-gray-900 dark:text-white font-mono" title="{{ job.id }}">{{ job.id[:8] }}...</span>
+                <span class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate max-w-[200px]" title="{{ job.source_id }}">{{ job.source_id }}</span>
+              </div>
+            </td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm">
+              {% if job.status == 'completed' %}
+                <span class="inline-flex items-center gap-1.5 rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20 dark:bg-green-900/20 dark:text-green-400 dark:ring-green-500/20">
+                  <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> Completed
+                </span>
+              {% elif job.status == 'polling' %}
+                <span class="inline-flex items-center gap-1.5 rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20 dark:bg-blue-900/20 dark:text-blue-400 dark:ring-blue-500/20">
+                  <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span> Polling
+                </span>
+              {% elif job.status == 'failed' %}
+                <span class="inline-flex items-center gap-1.5 rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/10 dark:bg-red-900/20 dark:text-red-400 dark:ring-red-500/20">
+                  <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> Failed
+                </span>
+              {% elif job.status == 'submitted' %}
+                <span class="inline-flex items-center gap-1.5 rounded-md bg-yellow-50 px-2 py-1 text-xs font-medium text-yellow-800 ring-1 ring-inset ring-yellow-600/20 dark:bg-yellow-900/20 dark:text-yellow-500 dark:ring-yellow-500/20">
+                  <span class="w-1.5 h-1.5 rounded-full bg-yellow-500"></span> Submitted
+                </span>
+              {% else %}
+                <span class="inline-flex items-center gap-1.5 rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10 dark:bg-gray-800 dark:text-gray-400 dark:ring-gray-700">
+                  {{ job.status | title }}
+                </span>
+              {% endif %}
+            </td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 dark:text-gray-400 font-mono text-xs">
+              {{ (job.provider_job_id[:12] + '...') if job.provider_job_id else '-' }}
+            </td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 dark:text-gray-400">
+              <div class="flex items-center gap-2">
+                <span class="font-medium text-gray-900 dark:text-gray-200">{{ job.finished_records }}/{{ job.total_records }}</span>
+                {% if job.skipped_records > 0 %}
+                  <span class="text-xs text-amber-600 dark:text-amber-500">({{ job.skipped_records }} skip)</span>
+                {% endif %}
+              </div>
+            </td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm">
+              {% if job.status == 'failed' %}
+              <form method="post" action="/admin/jobs/{{ job.id }}/retry">
+                <button type="submit" class="rounded bg-white dark:bg-gray-800 px-2 py-1 text-xs font-semibold text-gray-900 dark:text-gray-200 shadow-sm ring-1 ring-inset ring-gray-300 dark:ring-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                  Retry
+                </button>
+              </form>
+              {% else %}
+                <span class="text-gray-400 dark:text-gray-600">-</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="5" class="px-6 py-12 text-center">
+              <svg class="mx-auto h-12 w-12 text-gray-400 dark:text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+              <p class="text-sm text-gray-500 dark:text-gray-400">No jobs have been created yet.</p>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
 {% endblock %}
-

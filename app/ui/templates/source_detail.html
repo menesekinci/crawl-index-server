@@ -1,79 +1,180 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="stack">
-  <div class="title-row">
+<div class="space-y-6">
+  <div class="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 pb-4">
     <div>
-      <h1>{{ source.name if source else 'Source not found' }}</h1>
+      <div class="flex items-center gap-3">
+        <h1 class="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">{{ source.name if source else 'Source not found' }}</h1>
+        {% if source %}
+          <span class="inline-flex items-center gap-1.5 rounded-full {{ 'bg-green-50 text-green-700 ring-green-600/20 dark:bg-green-900/20 dark:text-green-400 dark:ring-green-500/20' if source.enabled else 'bg-gray-50 text-gray-600 ring-gray-500/10 dark:bg-gray-800 dark:text-gray-400 dark:ring-gray-700' }} px-2 py-0.5 text-xs font-medium ring-1 ring-inset">
+            <span class="w-1.5 h-1.5 rounded-full {{ 'bg-green-500' if source.enabled else 'bg-gray-400' }}"></span>
+            {{ 'Active' if source.enabled else 'Disabled' }}
+          </span>
+        {% endif %}
+      </div>
       {% if source %}
-      <p class="muted">{{ source.start_url }}</p>
+      <a href="{{ source.start_url }}" target="_blank" rel="noopener noreferrer" class="mt-2 text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1.5">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+        {{ source.start_url }}
+      </a>
       {% endif %}
     </div>
+    
     {% if source %}
-    <div class="inline">
-      <form method="post" action="/admin/sources/{{ source.id }}/crawl">
-        <button type="submit" {% if not cloudflare_enabled %}disabled{% endif %}>Start crawl</button>
-      </form>
+    <div class="flex items-center gap-3">
       <form method="post" action="/admin/sources/{{ source.id }}/reindex">
-        <button class="secondary" type="submit">Reindex</button>
+        <button type="submit" class="rounded-lg bg-white dark:bg-gray-800 px-4 py-2.5 text-sm font-semibold text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-300 dark:ring-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2">
+          <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+          Reindex
+        </button>
+      </form>
+      <form method="post" action="/admin/sources/{{ source.id }}/crawl">
+        <button type="submit" {% if not cloudflare_enabled %}disabled{% endif %} class="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          Start Crawl
+        </button>
       </form>
     </div>
     {% endif %}
   </div>
 
   {% if source %}
-  <div class="grid">
-    <section class="panel">
-      <h2>Settings</h2>
-      <table>
-        <tbody>
-          <tr><th>Schedule</th><td>{{ source.cron_expr or 'manual only' }}</td></tr>
-          <tr><th>Depth</th><td>{{ source.crawl_depth }}</td></tr>
-          <tr><th>Limit</th><td>{{ source.crawl_limit }}</td></tr>
-          <tr><th>Formats</th><td>{{ source.formats|join(', ') }}</td></tr>
-          <tr><th>Render</th><td>{{ source.render }}</td></tr>
-          <tr><th>Last success</th><td>{{ source.last_success_at or '-' }}</td></tr>
-          <tr><th>Next run</th><td>{{ source.next_run_at or '-' }}</td></tr>
-        </tbody>
-      </table>
-    </section>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+    
+    <!-- Settings Panel -->
+    <div class="bg-white dark:bg-gray-950 shadow-sm ring-1 ring-gray-900/5 dark:ring-white/10 rounded-xl overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/[0.02]">
+        <h2 class="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+          <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+          Configuration
+        </h2>
+      </div>
+      <div class="px-6 py-5">
+        <dl class="divide-y divide-gray-100 dark:divide-white/10 text-sm">
+          <div class="py-3 flex justify-between">
+            <dt class="text-gray-500 dark:text-gray-400">Schedule</dt>
+            <dd class="font-medium text-gray-900 dark:text-white">{{ source.cron_expr or 'Manual Only' }}</dd>
+          </div>
+          <div class="py-3 flex justify-between">
+            <dt class="text-gray-500 dark:text-gray-400">Depth / Limit</dt>
+            <dd class="font-medium text-gray-900 dark:text-white">{{ source.crawl_depth }} depth &bull; {{ source.crawl_limit }} pages</dd>
+          </div>
+          <div class="py-3 flex justify-between">
+            <dt class="text-gray-500 dark:text-gray-400">Formats</dt>
+            <dd class="font-medium text-gray-900 dark:text-white uppercase text-xs tracking-wide bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">{{ source.formats|join(', ') }}</dd>
+          </div>
+          <div class="py-3 flex justify-between">
+            <dt class="text-gray-500 dark:text-gray-400">JS Render</dt>
+            <dd class="font-medium text-gray-900 dark:text-white">{{ 'Yes' if source.render else 'No' }}</dd>
+          </div>
+          <div class="py-3 flex justify-between">
+            <dt class="text-gray-500 dark:text-gray-400">Last Success</dt>
+            <dd class="font-medium text-gray-900 dark:text-white">{{ source.last_success_at.strftime('%Y-%m-%d %H:%M') if source.last_success_at else 'Never' }}</dd>
+          </div>
+          <div class="py-3 flex justify-between">
+            <dt class="text-gray-500 dark:text-gray-400">Next Run</dt>
+            <dd class="font-medium text-gray-900 dark:text-white">{{ source.next_run_at.strftime('%Y-%m-%d %H:%M') if source.next_run_at else '-' }}</dd>
+          </div>
+        </dl>
+      </div>
+    </div>
 
-    <section class="panel">
-      <h2>Recent jobs</h2>
-      <table>
-        <thead><tr><th>ID</th><th>Status</th><th>Records</th></tr></thead>
-        <tbody>
-          {% for job in jobs %}
+    <!-- Recent Jobs Panel -->
+    <div class="bg-white dark:bg-gray-950 shadow-sm ring-1 ring-gray-900/5 dark:ring-white/10 rounded-xl overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/[0.02]">
+        <h2 class="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+          <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          Recent Jobs
+        </h2>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-white/10">
+          <thead class="bg-gray-50/50 dark:bg-transparent">
+            <tr>
+              <th scope="col" class="py-2.5 pl-6 pr-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Job ID</th>
+              <th scope="col" class="px-3 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Status</th>
+              <th scope="col" class="px-3 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Records</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100 dark:divide-white/5 bg-white dark:bg-transparent text-sm">
+            {% for job in jobs[:5] %}
+            <tr class="hover:bg-gray-50/50 dark:hover:bg-white/[0.02]">
+              <td class="whitespace-nowrap py-3 pl-6 pr-3 font-mono text-xs text-gray-500 dark:text-gray-400">{{ job.id[:8] }}...</td>
+              <td class="whitespace-nowrap px-3 py-3">
+                {% if job.status == 'completed' %}
+                  <span class="text-green-600 dark:text-green-400 font-medium text-xs">Completed</span>
+                {% elif job.status == 'polling' %}
+                  <span class="text-blue-600 dark:text-blue-400 font-medium text-xs flex items-center gap-1"><span class="w-1 h-1 rounded-full bg-blue-500 animate-pulse"></span> Polling</span>
+                {% elif job.status == 'failed' %}
+                  <span class="text-red-600 dark:text-red-400 font-medium text-xs">Failed</span>
+                {% else %}
+                  <span class="text-gray-600 dark:text-gray-400 font-medium text-xs">{{ job.status | title }}</span>
+                {% endif %}
+              </td>
+              <td class="whitespace-nowrap px-3 py-3 text-gray-900 dark:text-gray-300 font-medium">
+                {{ job.finished_records }}/{{ job.total_records }}
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="3" class="px-6 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                No jobs executed yet.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% if jobs|length > 5 %}
+        <div class="px-6 py-3 border-t border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-transparent text-center">
+          <a href="/admin/jobs" class="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline">View all jobs</a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Documents Panel -->
+  <div class="bg-white dark:bg-gray-950 shadow-sm ring-1 ring-gray-900/5 dark:ring-white/10 rounded-xl overflow-hidden mt-8">
+    <div class="px-6 py-4 border-b border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/[0.02] flex justify-between items-center">
+      <h2 class="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+        <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+        Indexed Documents
+      </h2>
+      <span class="text-xs font-medium text-gray-500 bg-gray-100 dark:bg-gray-800 px-2.5 py-0.5 rounded-full">{{ documents|length }} items</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-200 dark:divide-white/10">
+        <thead class="bg-gray-50/50 dark:bg-transparent">
           <tr>
-            <td>{{ job.id }}</td>
-            <td>{{ job.status }}</td>
-            <td>{{ job.finished_records }}/{{ job.total_records }}</td>
+            <th scope="col" class="py-3 pl-6 pr-3 text-left text-xs font-semibold text-gray-900 dark:text-gray-200">Title & URL</th>
+            <th scope="col" class="px-3 py-3 text-left text-xs font-semibold text-gray-900 dark:text-gray-200 w-48">Fetched At</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100 dark:divide-white/5 bg-white dark:bg-transparent text-sm">
+          {% for document in documents %}
+          <tr class="hover:bg-gray-50/50 dark:hover:bg-white/[0.02] transition-colors">
+            <td class="py-4 pl-6 pr-3">
+              <a href="/admin/documents/{{ document.id }}" class="font-medium text-blue-600 dark:text-blue-400 hover:underline block truncate max-w-xl">
+                {{ document.title or document.url.split('/')[-1] or 'Untitled document' }}
+              </a>
+              <span class="text-xs text-gray-500 dark:text-gray-400 mt-1 block truncate max-w-xl">{{ document.url }}</span>
+            </td>
+            <td class="whitespace-nowrap px-3 py-4 text-gray-500 dark:text-gray-400 text-xs">
+              {{ document.fetched_at.strftime('%Y-%m-%d %H:%M') }}
+            </td>
           </tr>
           {% else %}
-          <tr><td colspan="3">No jobs yet.</td></tr>
+          <tr>
+            <td colspan="2" class="px-6 py-12 text-center">
+              <svg class="mx-auto h-10 w-10 text-gray-400 dark:text-gray-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+              <p class="text-sm text-gray-500 dark:text-gray-400">No documents indexed yet.</p>
+            </td>
+          </tr>
           {% endfor %}
         </tbody>
       </table>
-    </section>
+    </div>
   </div>
-
-  <section class="panel">
-    <h2>Documents</h2>
-    <table>
-      <thead><tr><th>Title</th><th>URL</th><th>Fetched</th></tr></thead>
-      <tbody>
-        {% for document in documents %}
-        <tr>
-          <td><a href="/admin/documents/{{ document.id }}">{{ document.title or 'Untitled document' }}</a></td>
-          <td>{{ document.url }}</td>
-          <td>{{ document.fetched_at }}</td>
-        </tr>
-        {% else %}
-        <tr><td colspan="3">No documents yet.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </section>
   {% endif %}
 </div>
 {% endblock %}
-

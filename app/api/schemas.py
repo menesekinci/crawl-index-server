@@ -14,7 +14,7 @@ class SourceCreate(BaseModel):
     cron_expr: str | None = None
     enabled: bool = True
     crawl_depth: int = 1
-    crawl_limit: int = 50
+    crawl_limit: int = 100
     render: bool = False
     formats: list[str] = Field(default_factory=lambda: ["markdown"])
 

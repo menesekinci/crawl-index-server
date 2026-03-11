@@ -1,63 +1,159 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="stack">
-  <div class="title-row">
+<div class="space-y-8">
+  <div class="flex items-center justify-between">
     <div>
-      <h1>Sources</h1>
-      <p class="muted">Create crawlable documentation sources and inspect their latest jobs.</p>
+      <h1 class="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Sources</h1>
+      <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Manage crawlable documentation targets and their settings.</p>
     </div>
-    <div class="badge {{ 'ok' if cloudflare_enabled else 'bad' }}">
-      {{ 'Cloudflare ready' if cloudflare_enabled else 'Cloudflare credentials missing' }}
+    <div>
+      {% if cloudflare_enabled %}
+        <span class="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20 dark:bg-green-900/20 dark:text-green-400 dark:ring-green-500/20">
+          <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> Cloudflare Ready
+        </span>
+      {% else %}
+        <span class="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/10 dark:bg-red-900/20 dark:text-red-400 dark:ring-red-500/20">
+          <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> Missing Credentials
+        </span>
+      {% endif %}
     </div>
   </div>
 
-  <div class="grid">
-    <section class="panel">
-      <h2>Add source</h2>
-      <form method="post" action="/admin/sources" class="stack">
-        <label>Name <input name="name" required /></label>
-        <label>Start URL <input name="start_url" type="url" required /></label>
-        <label>Allowed domains <input name="allowed_domains" placeholder="docs.example.com, example.com" /></label>
-        <label>Cron expression <input name="cron_expr" placeholder="0 * * * *" /></label>
-        <div class="grid">
-          <label>Depth <input name="crawl_depth" type="number" min="1" value="1" /></label>
-          <label>Limit <input name="crawl_limit" type="number" min="1" value="50" /></label>
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+    
+    <!-- Source List (Wider) -->
+    <div class="lg:col-span-2 space-y-4">
+      <div class="bg-white dark:bg-gray-950 shadow-sm ring-1 ring-gray-900/5 dark:ring-white/10 rounded-xl overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 dark:border-white/10 flex justify-between items-center bg-gray-50/50 dark:bg-white/[0.02]">
+          <h2 class="font-semibold text-gray-900 dark:text-white">Configured Sources</h2>
+          <span class="text-xs font-medium text-gray-500 bg-gray-100 dark:bg-gray-800 px-2.5 py-0.5 rounded-full">{{ sources|length }} total</span>
         </div>
-        <div class="inline">
-          <label><input type="checkbox" name="enabled" checked /> Enabled</label>
-          <label><input type="checkbox" name="render" /> Render with browser</label>
-        </div>
-        <label>Formats <input name="formats" value="markdown" /></label>
-        <button type="submit">Create source</button>
-      </form>
-    </section>
-
-    <section class="panel">
-      <h2>Source list</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>URL</th>
-            <th>Schedule</th>
-            <th>Next run</th>
-          </tr>
-        </thead>
-        <tbody>
+        
+        <div class="divide-y divide-gray-100 dark:divide-white/10">
           {% for source in sources %}
-          <tr>
-            <td><a href="/admin/sources/{{ source.id }}">{{ source.name }}</a></td>
-            <td>{{ source.start_url }}</td>
-            <td>{{ source.cron_expr or 'manual' }}</td>
-            <td>{{ source.next_run_at or '-' }}</td>
-          </tr>
+          <div class="px-6 py-5 hover:bg-gray-50/50 dark:hover:bg-white/[0.02] transition-colors group">
+            <div class="flex items-start justify-between">
+              <div class="min-w-0 flex-1">
+                <a href="/admin/sources/{{ source.id }}" class="text-base font-semibold text-blue-600 dark:text-blue-400 hover:underline hover:text-blue-700 dark:hover:text-blue-300 transition-colors block truncate">
+                  {{ source.name }}
+                </a>
+                <a href="{{ source.start_url }}" target="_blank" rel="noopener noreferrer" class="mt-1 text-sm text-gray-500 dark:text-gray-400 truncate flex items-center gap-1.5 hover:text-gray-700 dark:hover:text-gray-300">
+                  <svg class="w-4 h-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                  {{ source.start_url }}
+                </a>
+              </div>
+              <div class="ml-4 flex flex-col items-end text-sm">
+                {% if source.cron_expr %}
+                  <span class="inline-flex items-center gap-1 text-gray-600 dark:text-gray-300">
+                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    {{ source.cron_expr }}
+                  </span>
+                {% else %}
+                  <span class="inline-flex items-center gap-1 text-gray-400 dark:text-gray-500 italic text-xs uppercase tracking-wider">
+                    Manual
+                  </span>
+                {% endif %}
+                <span class="mt-1 text-xs text-gray-500 dark:text-gray-500 flex items-center gap-1.5">
+                  {% if source.next_run_at %}
+                    Next: <span class="font-medium text-gray-700 dark:text-gray-300">{{ source.next_run_at.strftime('%Y-%m-%d %H:%M') if source.next_run_at else '-' }}</span>
+                  {% else %}
+                    Not scheduled
+                  {% endif %}
+                </span>
+              </div>
+            </div>
+            
+            <div class="mt-4 flex items-center gap-4 text-xs">
+              <span class="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+                <span class="w-1.5 h-1.5 rounded-full {{ 'bg-green-500' if source.enabled else 'bg-gray-400' }}"></span>
+                {{ 'Active' if source.enabled else 'Disabled' }}
+              </span>
+              <span class="text-gray-300 dark:text-gray-700">&bull;</span>
+              <span class="text-gray-500 dark:text-gray-400">Depth: <span class="font-medium text-gray-700 dark:text-gray-300">{{ source.crawl_depth }}</span></span>
+              <span class="text-gray-300 dark:text-gray-700">&bull;</span>
+              <span class="text-gray-500 dark:text-gray-400">Limit: <span class="font-medium text-gray-700 dark:text-gray-300">{{ source.crawl_limit }}</span></span>
+            </div>
+          </div>
           {% else %}
-          <tr><td colspan="4">No sources yet.</td></tr>
+          <div class="px-6 py-12 text-center">
+            <svg class="mx-auto h-12 w-12 text-gray-400 dark:text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">No sources yet</h3>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Add a new documentation source to begin indexing.</p>
+          </div>
           {% endfor %}
-        </tbody>
-      </table>
-    </section>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add Source Form (Sidebar) -->
+    <div class="bg-white dark:bg-gray-950 shadow-sm ring-1 ring-gray-900/5 dark:ring-white/10 rounded-xl overflow-hidden sticky top-8">
+      <div class="px-6 py-4 border-b border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/[0.02]">
+        <h2 class="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+          <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+          Add New Source
+        </h2>
+      </div>
+      
+      <form method="post" action="/admin/sources" class="p-6 space-y-5">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
+          <input name="name" required placeholder="e.g., React Docs" 
+                 class="w-full rounded-lg border-0 py-2 px-3 text-sm bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white ring-1 ring-inset ring-gray-300 dark:ring-gray-700 focus:ring-2 focus:ring-inset focus:ring-blue-600 transition-shadow" />
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start URL</label>
+          <input name="start_url" type="url" required placeholder="https://..." 
+                 class="w-full rounded-lg border-0 py-2 px-3 text-sm bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white ring-1 ring-inset ring-gray-300 dark:ring-gray-700 focus:ring-2 focus:ring-inset focus:ring-blue-600 transition-shadow" />
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Allowed Domains</label>
+          <input name="allowed_domains" placeholder="docs.example.com" 
+                 class="w-full rounded-lg border-0 py-2 px-3 text-sm bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white ring-1 ring-inset ring-gray-300 dark:ring-gray-700 focus:ring-2 focus:ring-inset focus:ring-blue-600 transition-shadow" />
+          <p class="mt-1 text-[11px] text-gray-500">Comma separated domains to constrain crawling.</p>
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Cron Expression</label>
+          <input name="cron_expr" placeholder="0 0 * * * (Daily)" 
+                 class="w-full rounded-lg border-0 py-2 px-3 text-sm bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white ring-1 ring-inset ring-gray-300 dark:ring-gray-700 focus:ring-2 focus:ring-inset focus:ring-blue-600 transition-shadow" />
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Depth</label>
+            <input name="crawl_depth" type="number" min="1" value="2" 
+                   class="w-full rounded-lg border-0 py-2 px-3 text-sm bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white ring-1 ring-inset ring-gray-300 dark:ring-gray-700 focus:ring-2 focus:ring-inset focus:ring-blue-600 transition-shadow" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Limit (Pages)</label>
+            <input name="crawl_limit" type="number" min="1" value="100" 
+                   class="w-full rounded-lg border-0 py-2 px-3 text-sm bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white ring-1 ring-inset ring-gray-300 dark:ring-gray-700 focus:ring-2 focus:ring-inset focus:ring-blue-600 transition-shadow" />
+          </div>
+        </div>
+        
+        <div class="pt-2 flex flex-col gap-3">
+          <label class="flex items-center gap-2 cursor-pointer group">
+            <input type="checkbox" name="enabled" checked class="rounded border-gray-300 text-blue-600 focus:ring-blue-600 bg-gray-50 dark:bg-gray-900 dark:border-gray-700" />
+            <span class="text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">Enabled</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer group">
+            <input type="checkbox" name="render" class="rounded border-gray-300 text-blue-600 focus:ring-blue-600 bg-gray-50 dark:bg-gray-900 dark:border-gray-700" />
+            <span class="text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">JS Render (Browser)</span>
+          </label>
+        </div>
+        
+        <input type="hidden" name="formats" value="markdown" />
+        
+        <div class="pt-4 mt-4 border-t border-gray-100 dark:border-gray-800">
+          <button type="submit" class="w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 transition-colors flex justify-center items-center gap-2">
+            Create Source
+          </button>
+        </div>
+      </form>
+    </div>
+    
   </div>
 </div>
 {% endblock %}
-

@@ -1,30 +1,86 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="stack">
-  <div class="title-row">
-    <div>
-      <h1>{{ document.title if document else 'Document not found' }}</h1>
-      {% if document %}
-      <p class="muted">{{ document.url }}</p>
-      {% endif %}
+<div class="space-y-6">
+  <div class="flex flex-col gap-2 border-b border-gray-200 dark:border-gray-800 pb-4">
+    <div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-2">
+      <a href="/admin/sources/{{ document.source_id }}" class="hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-1">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+        Back to Source
+      </a>
     </div>
+    
+    <h1 class="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">{{ document.title if document and document.title else 'Untitled Document' }}</h1>
+    {% if document %}
+    <a href="{{ document.url }}" target="_blank" rel="noopener noreferrer" class="text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1.5 break-all">
+      <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+      {{ document.url }}
+    </a>
+    {% endif %}
   </div>
 
   {% if document %}
-  <section class="panel">
-    <table>
-      <tbody>
-        <tr><th>Status code</th><td>{{ document.status_code }}</td></tr>
-        <tr><th>Fetched</th><td>{{ document.fetched_at }}</td></tr>
-        <tr><th>Hash</th><td>{{ document.content_hash }}</td></tr>
-      </tbody>
-    </table>
-  </section>
-  <section class="panel">
-    <h2>Markdown</h2>
-    <pre>{{ document.raw_markdown }}</pre>
-  </section>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+    
+    <!-- Metadata Panel -->
+    <div class="md:col-span-1 bg-white dark:bg-gray-950 shadow-sm ring-1 ring-gray-900/5 dark:ring-white/10 rounded-xl overflow-hidden sticky top-8">
+      <div class="px-5 py-4 border-b border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/[0.02]">
+        <h2 class="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+          <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          Document Metadata
+        </h2>
+      </div>
+      <div class="px-5 py-4">
+        <dl class="divide-y divide-gray-100 dark:divide-white/10 text-sm">
+          <div class="py-3 flex flex-col gap-1">
+            <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status Code</dt>
+            <dd class="flex items-center gap-2">
+              {% if document.status_code == 200 %}
+                <span class="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20 dark:bg-green-900/20 dark:text-green-400">200 OK</span>
+              {% else %}
+                <span class="inline-flex items-center rounded-full bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10 dark:bg-gray-800 dark:text-gray-400">{{ document.status_code or 'Unknown' }}</span>
+              {% endif %}
+            </dd>
+          </div>
+          <div class="py-3 flex flex-col gap-1">
+            <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Fetched At</dt>
+            <dd class="text-gray-900 dark:text-white">{{ document.fetched_at.strftime('%Y-%m-%d %H:%M:%S') }}</dd>
+          </div>
+          <div class="py-3 flex flex-col gap-1">
+            <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Content Hash</dt>
+            <dd class="text-gray-900 dark:text-gray-300 font-mono text-[11px] break-all">{{ document.content_hash }}</dd>
+          </div>
+          <div class="py-3 flex flex-col gap-1">
+            <dt class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Document ID</dt>
+            <dd class="text-gray-500 dark:text-gray-500 font-mono text-[11px] break-all">{{ document.id }}</dd>
+          </div>
+        </dl>
+      </div>
+    </div>
+
+    <!-- Markdown Content Panel -->
+    <div class="md:col-span-2 bg-white dark:bg-gray-950 shadow-sm ring-1 ring-gray-900/5 dark:ring-white/10 rounded-xl overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/[0.02] flex justify-between items-center">
+        <h2 class="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+          <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+          Raw Markdown
+        </h2>
+        <button onclick="navigator.clipboard.writeText(document.querySelector('pre').innerText); this.innerHTML='<span class=\'text-green-500\'>Copied!</span>'; setTimeout(() => this.innerText='Copy', 2000);" 
+                class="text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">
+          Copy
+        </button>
+      </div>
+      <div class="p-0 bg-gray-50 dark:bg-gray-900/50 overflow-x-auto max-h-[800px] overflow-y-auto">
+        <pre class="p-6 text-sm text-gray-800 dark:text-gray-300 font-mono whitespace-pre-wrap word-break">{{ document.raw_markdown }}</pre>
+      </div>
+    </div>
+    
+  </div>
+  {% else %}
+  <div class="rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-800 p-12 text-center">
+    <svg class="mx-auto h-12 w-12 text-gray-400 dark:text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+    <h3 class="mt-2 text-sm font-semibold text-gray-900 dark:text-white">Document unavailable</h3>
+    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">The requested document could not be found in the local database.</p>
+  </div>
   {% endif %}
 </div>
 {% endblock %}
-
