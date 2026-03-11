@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="stack">
+  <div class="title-row">
+    <div>
+      <h1>{{ document.title if document else 'Document not found' }}</h1>
+      {% if document %}
+      <p class="muted">{{ document.url }}</p>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if document %}
+  <section class="panel">
+    <table>
+      <tbody>
+        <tr><th>Status code</th><td>{{ document.status_code }}</td></tr>
+        <tr><th>Fetched</th><td>{{ document.fetched_at }}</td></tr>
+        <tr><th>Hash</th><td>{{ document.content_hash }}</td></tr>
+      </tbody>
+    </table>
+  </section>
+  <section class="panel">
+    <h2>Markdown</h2>
+    <pre>{{ document.raw_markdown }}</pre>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}
+

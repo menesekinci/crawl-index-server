@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="stack">
+  <div class="title-row">
+    <div>
+      <h1>Semantic Search</h1>
+      <p class="muted">Search indexed crawl content with local embeddings and Qdrant local mode.</p>
+    </div>
+  </div>
+
+  <section class="panel">
+    <form class="stack" hx-post="/admin/search/results" hx-target="#results" hx-swap="innerHTML">
+      <label>Query <input name="query" placeholder="How to authenticate API requests?" required /></label>
+      <div class="grid">
+        <label>Limit <input name="limit" type="number" value="10" min="1" max="50" /></label>
+        <label>Source
+          <select name="source_id">
+            <option value="">All sources</option>
+            {% for source in sources %}
+            <option value="{{ source.id }}">{{ source.name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      </div>
+      <button type="submit">Search</button>
+    </form>
+  </section>
+
+  <section id="results" class="panel">
+    {% include "partials/search_results.html" %}
+  </section>
+</div>
+{% endblock %}
+

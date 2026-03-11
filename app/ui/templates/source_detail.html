@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="stack">
+  <div class="title-row">
+    <div>
+      <h1>{{ source.name if source else 'Source not found' }}</h1>
+      {% if source %}
+      <p class="muted">{{ source.start_url }}</p>
+      {% endif %}
+    </div>
+    {% if source %}
+    <div class="inline">
+      <form method="post" action="/admin/sources/{{ source.id }}/crawl">
+        <button type="submit" {% if not cloudflare_enabled %}disabled{% endif %}>Start crawl</button>
+      </form>
+      <form method="post" action="/admin/sources/{{ source.id }}/reindex">
+        <button class="secondary" type="submit">Reindex</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if source %}
+  <div class="grid">
+    <section class="panel">
+      <h2>Settings</h2>
+      <table>
+        <tbody>
+          <tr><th>Schedule</th><td>{{ source.cron_expr or 'manual only' }}</td></tr>
+          <tr><th>Depth</th><td>{{ source.crawl_depth }}</td></tr>
+          <tr><th>Limit</th><td>{{ source.crawl_limit }}</td></tr>
+          <tr><th>Formats</th><td>{{ source.formats|join(', ') }}</td></tr>
+          <tr><th>Render</th><td>{{ source.render }}</td></tr>
+          <tr><th>Last success</th><td>{{ source.last_success_at or '-' }}</td></tr>
+          <tr><th>Next run</th><td>{{ source.next_run_at or '-' }}</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <h2>Recent jobs</h2>
+      <table>
+        <thead><tr><th>ID</th><th>Status</th><th>Records</th></tr></thead>
+        <tbody>
+          {% for job in jobs %}
+          <tr>
+            <td>{{ job.id }}</td>
+            <td>{{ job.status }}</td>
+            <td>{{ job.finished_records }}/{{ job.total_records }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="3">No jobs yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+  </div>
+
+  <section class="panel">
+    <h2>Documents</h2>
+    <table>
+      <thead><tr><th>Title</th><th>URL</th><th>Fetched</th></tr></thead>
+      <tbody>
+        {% for document in documents %}
+        <tr>
+          <td><a href="/admin/documents/{{ document.id }}">{{ document.title or 'Untitled document' }}</a></td>
+          <td>{{ document.url }}</td>
+          <td>{{ document.fetched_at }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3">No documents yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}
+

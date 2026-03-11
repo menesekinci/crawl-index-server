@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="stack">
+  <div class="title-row">
+    <div>
+      <h1>Sources</h1>
+      <p class="muted">Create crawlable documentation sources and inspect their latest jobs.</p>
+    </div>
+    <div class="badge {{ 'ok' if cloudflare_enabled else 'bad' }}">
+      {{ 'Cloudflare ready' if cloudflare_enabled else 'Cloudflare credentials missing' }}
+    </div>
+  </div>
+
+  <div class="grid">
+    <section class="panel">
+      <h2>Add source</h2>
+      <form method="post" action="/admin/sources" class="stack">
+        <label>Name <input name="name" required /></label>
+        <label>Start URL <input name="start_url" type="url" required /></label>
+        <label>Allowed domains <input name="allowed_domains" placeholder="docs.example.com, example.com" /></label>
+        <label>Cron expression <input name="cron_expr" placeholder="0 * * * *" /></label>
+        <div class="grid">
+          <label>Depth <input name="crawl_depth" type="number" min="1" value="1" /></label>
+          <label>Limit <input name="crawl_limit" type="number" min="1" value="50" /></label>
+        </div>
+        <div class="inline">
+          <label><input type="checkbox" name="enabled" checked /> Enabled</label>
+          <label><input type="checkbox" name="render" /> Render with browser</label>
+        </div>
+        <label>Formats <input name="formats" value="markdown" /></label>
+        <button type="submit">Create source</button>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>Source list</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>URL</th>
+            <th>Schedule</th>
+            <th>Next run</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for source in sources %}
+          <tr>
+            <td><a href="/admin/sources/{{ source.id }}">{{ source.name }}</a></td>
+            <td>{{ source.start_url }}</td>
+            <td>{{ source.cron_expr or 'manual' }}</td>
+            <td>{{ source.next_run_at or '-' }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4">No sources yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+  </div>
+</div>
+{% endblock %}
+

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="stack">
+  <div class="title-row">
+    <div>
+      <h1>Jobs</h1>
+      <p class="muted">Track crawl submission, polling, and completion state.</p>
+    </div>
+  </div>
+  <section class="panel">
+    <table>
+      <thead>
+        <tr>
+          <th>Job</th>
+          <th>Source</th>
+          <th>Status</th>
+          <th>Provider job</th>
+          <th>Progress</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for job in jobs %}
+        <tr>
+          <td>{{ job.id }}</td>
+          <td>{{ job.source_id }}</td>
+          <td>{{ job.status }}</td>
+          <td>{{ job.provider_job_id or '-' }}</td>
+          <td>{{ job.finished_records }}/{{ job.total_records }} ({{ job.skipped_records }} skipped)</td>
+          <td>
+            {% if job.status == 'failed' %}
+            <form method="post" action="/admin/jobs/{{ job.id }}/retry">
+              <button class="secondary" type="submit">Retry</button>
+            </form>
+            {% else %}
+            -
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6">No jobs found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</div>
+{% endblock %}
+

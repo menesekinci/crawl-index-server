@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ title or "Crawl Index Server" }}</title>
+    <link rel="stylesheet" href="/static/app.css" />
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          Crawl Index Server
+          <small>Local-first crawl + semantic search</small>
+        </div>
+        <nav class="nav">
+          <a href="/admin/sources">Sources</a>
+          <a href="/admin/jobs">Jobs</a>
+          <a href="/admin/search">Search</a>
+        </nav>
+      </aside>
+      <main class="content">
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </body>
+  </html>
+

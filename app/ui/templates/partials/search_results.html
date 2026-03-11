@@ -1,0 +1,23 @@
+{% if results %}
+<table>
+  <thead>
+    <tr>
+      <th>Title</th>
+      <th>Score</th>
+      <th>Snippet</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for result in results %}
+    <tr>
+      <td><a href="/admin/documents/{{ result.document_id }}">{{ result.title or result.url }}</a></td>
+      <td>{{ "%.4f"|format(result.score) }}</td>
+      <td>{{ result.snippet }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">No results yet. Run a crawl and search after the first index is ready.</p>
+{% endif %}
+
