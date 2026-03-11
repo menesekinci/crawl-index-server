@@ -61,12 +61,13 @@ class VectorStore:
             query_filter = models.Filter(
                 must=[models.FieldCondition(key="source_id", match=models.MatchValue(value=source_id))]
             )
-        results = self._client.search(
+        response = self._client.query_points(
             collection_name=self._settings.collection_name,
-            query_vector=query_vector,
+            query=query_vector,
             limit=limit,
             query_filter=query_filter,
         )
+        results = response.points
         return [
             {
                 "id": item.id,
