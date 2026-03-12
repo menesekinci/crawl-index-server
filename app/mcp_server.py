@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import webbrowser
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any
@@ -7,6 +8,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 from app.main import ServiceContainer, build_container
+from app.config import get_settings
 
 
 @dataclass
@@ -191,6 +193,16 @@ def create_mcp_server(container: MCPContainer | None = None) -> FastMCP:
     @asynccontextmanager
     async def lifespan(_: FastMCP):
         try:
+            # Auto-open Web UI when MCP starts
+            settings = get_settings()
+            ui_url = f"http://{settings.app_host}:{settings.app_port}/admin/sources"
+            
+            # Start the fastAPI server if not running is tricky from here, 
+            # but we assume they run via uvicorn and this is just the client or the MCP also mounts it.
+            # Actually, the user runs the FastAPI app and MCP separately or FastMCP might not serve the UI directly.
+            # Assuming the Web UI is up, we just open the tab.
+            webbrowser.open_new_tab(ui_url)
+            
             yield runtime
         finally:
             runtime.close()
@@ -249,6 +261,18 @@ def create_mcp_server(container: MCPContainer | None = None) -> FastMCP:
     def search_docs(query: str, limit: int = 10, source_id: str | None = None) -> list[dict[str, Any]]:
         """Run semantic search over indexed documents and return snippets with source context."""
         return adapter.search_docs(query=query, limit=limit, source_id=source_id)
+
+    @mcp.tool()
+    def get_web_ui_info() -> dict[str, str]:
+        """Provides the URL and capabilities of the Local Crawl Index Server's Web UI. Call this when the user asks about settings, missing credentials, or wants a visual dashboard."""
+        settings = get_settings()
+        base_url = f"http://{settings.app_host}:{settings.app_port}"
+        return {
+            "message": "The Crawl Index Server has a full Web UI running locally.",
+            "dashboard_url": f"{base_url}/admin/sources",
+            "settings_url": f"{base_url}/admin/settings",
+            "capabilities": "Users can visually manage sources, track crawl jobs in real-time, configure Cloudflare API tokens, and perform semantic searches."
+        }
 
     return mcp
 
