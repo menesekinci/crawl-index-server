@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="space-y-6 max-w-4xl mx-auto">
+  <div class="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 pb-4">
+    <div>
+      <h1 class="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Settings</h1>
+      <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Manage your system configuration and API tokens.</p>
+    </div>
+  </div>
+
+  <div class="bg-white dark:bg-gray-950 shadow-sm ring-1 ring-gray-900/5 dark:ring-white/10 rounded-xl overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/[0.02]">
+      <h2 class="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+        <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"></path></svg>
+        Cloudflare Browser Rendering API
+      </h2>
+      <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Required for crawling dynamic, javascript-heavy sites using the Cloudflare `/crawl` endpoint.</p>
+    </div>
+    
+    <form method="post" action="/admin/settings/cloudflare" class="p-6 space-y-5">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Account ID</label>
+        <input name="cf_account_id" value="{{ settings.cf_account_id or '' }}" placeholder="Enter your Cloudflare Account ID" 
+               class="block w-full rounded-lg border-0 py-2.5 px-3 text-gray-900 dark:text-white ring-1 ring-inset ring-gray-300 dark:ring-gray-700 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 bg-gray-50 dark:bg-gray-900 transition-shadow">
+      </div>
+      
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">API Token</label>
+        <input name="cf_api_token" type="password" value="{{ settings.cf_api_token or '' }}" placeholder="Enter your Cloudflare API Token" 
+               class="block w-full rounded-lg border-0 py-2.5 px-3 text-gray-900 dark:text-white ring-1 ring-inset ring-gray-300 dark:ring-gray-700 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 bg-gray-50 dark:bg-gray-900 transition-shadow">
+        <p class="mt-2 text-xs text-gray-500">The token needs <code class="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">Browser Rendering:Edit</code> permissions.</p>
+      </div>
+
+      <div class="pt-4 mt-4 border-t border-gray-100 dark:border-gray-800 flex justify-end">
+        <button type="submit" class="rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 transition-colors flex justify-center items-center gap-2">
+          Save Credentials
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

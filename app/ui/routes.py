@@ -139,3 +139,33 @@ def document_page(document_id: str, request: Request):
         {"document": document},
     )
 
+
+@ui_router.get("/admin/settings", response_class=HTMLResponse)
+def settings_page(request: Request):
+    return templates.TemplateResponse(
+        request,
+        "settings.html",
+        {"settings": request.app.state.settings},
+    )
+
+
+@ui_router.post("/admin/settings/cloudflare")
+def update_cloudflare_settings(
+    request: Request,
+    cf_account_id: str = Form(""),
+    cf_api_token: str = Form(""),
+):
+    import dotenv
+    from app.config import get_settings
+    
+    dotenv.set_key(".env", "CF_ACCOUNT_ID", cf_account_id)
+    dotenv.set_key(".env", "CF_API_TOKEN", cf_api_token)
+    
+    # Invalidate the cache to force a reload on the next request
+    get_settings.cache_clear()
+    
+    # We update the current app state so changes are immediate
+    request.app.state.settings = get_settings()
+    
+    return RedirectResponse(url="/admin/settings", status_code=303)
+
