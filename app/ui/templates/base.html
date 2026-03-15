@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full bg-gray-50 dark:bg-gray-900">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -7,78 +7,111 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
-      darkMode: 'media',
       theme: {
         extend: {
           fontFamily: {
-            sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+            sans: ['Public Sans', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+            display: ['Space Grotesk', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+            mono: ['IBM Plex Mono', 'ui-monospace', 'monospace'],
           }
         }
       }
     }
   </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/app.css" />
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-    [x-cloak] { display: none !important; }
-  </style>
 </head>
-<body class="h-full text-gray-900 dark:text-gray-100 font-sans antialiased">
-  <div class="flex h-screen overflow-hidden">
-    
-    <!-- Sidebar -->
-    <aside class="w-64 flex-shrink-0 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 flex flex-col">
-      <div class="h-16 flex items-center px-6 border-b border-gray-200 dark:border-gray-800">
-        <div class="flex flex-col">
-          <span class="text-lg font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-500 dark:from-blue-400 dark:to-indigo-300">
-            Crawl Index
-          </span>
-          <span class="text-[10px] text-gray-500 dark:text-gray-400 font-medium tracking-wider uppercase">Local Search Engine</span>
+<body class="app-body antialiased">
+  <input id="nav-toggle" type="checkbox" class="peer hidden" aria-hidden="true" />
+
+  <div class="min-h-screen lg:flex">
+    <label for="nav-toggle" class="fixed inset-0 z-30 bg-[#08120f]/50 opacity-0 pointer-events-none transition-opacity duration-200 peer-checked:opacity-100 peer-checked:pointer-events-auto lg:hidden"></label>
+
+    <aside class="app-sidebar fixed inset-y-0 left-0 z-40 flex w-[18.5rem] -translate-x-full flex-col transition-transform duration-300 peer-checked:translate-x-0 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0">
+      <div class="flex items-start justify-between gap-4 px-5 py-5">
+        <div class="brand-mark">
+          <div class="brand-badge">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M6 7.5h12M6 12h9m-9 4.5h7"></path>
+            </svg>
+          </div>
+          <div>
+            <p class="brand-title">Crawl Index</p>
+            <p class="brand-copy">Signal Room</p>
+          </div>
+        </div>
+        <label for="nav-toggle" class="lg:hidden inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-white/10 bg-white/5 text-[#f4ead9]">
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12"></path>
+          </svg>
+        </label>
+      </div>
+
+      <div class="px-5 pb-4">
+        <div class="sidebar-note">
+          <strong>Local index control deck</strong>
+          Track crawl jobs, curate sources, and search your private documentation archive without leaving the machine.
         </div>
       </div>
-      
-      <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-        <a href="/admin/sources" 
-           class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 {{ 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400' if request.url.path.startswith('/admin/sources') else 'text-gray-700 dark:text-gray-300' }}">
-          <svg class="w-5 h-5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-          Sources
+
+      <nav class="sidebar-nav flex-1 px-4 py-3">
+        <a href="/admin/sources" class="sidebar-link" data-active="{{ 'true' if request.url.path.startswith('/admin/sources') else 'false' }}">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+          <span>Sources</span>
         </a>
-        <a href="/admin/jobs" 
-           class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 {{ 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400' if request.url.path.startswith('/admin/jobs') else 'text-gray-700 dark:text-gray-300' }}">
-          <svg class="w-5 h-5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
-          Jobs
+        <a href="/admin/jobs" class="sidebar-link" data-active="{{ 'true' if request.url.path.startswith('/admin/jobs') else 'false' }}">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+          <span>Jobs</span>
         </a>
-        <a href="/admin/search" 
-           class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 {{ 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400' if request.url.path.startswith('/admin/search') else 'text-gray-700 dark:text-gray-300' }}">
-          <svg class="w-5 h-5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-          Search
+        <a href="/admin/search" class="sidebar-link" data-active="{{ 'true' if request.url.path.startswith('/admin/search') else 'false' }}">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+          <span>Search</span>
         </a>
-        <a href="/admin/settings" 
-           class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 {{ 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400' if request.url.path.startswith('/admin/settings') else 'text-gray-700 dark:text-gray-300' }}">
-          <svg class="w-5 h-5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-          Settings
+        <a href="/admin/settings" class="sidebar-link" data-active="{{ 'true' if request.url.path.startswith('/admin/settings') else 'false' }}">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+          <span>Settings</span>
         </a>
       </nav>
-      
-      <div class="p-4 border-t border-gray-200 dark:border-gray-800">
-        <div class="flex items-center gap-3 px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 text-xs text-gray-500 dark:text-gray-400">
-          <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-          System Online
+
+      <div class="mt-auto px-5 py-5">
+        <div class="online-pill">
+          <span class="online-pill__dot"></span>
+          System online
         </div>
       </div>
     </aside>
 
-    <!-- Main Content -->
-    <main class="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 relative">
-      <!-- Decorative background gradient -->
-      <div class="absolute top-0 inset-x-0 h-64 bg-gradient-to-b from-blue-50/50 to-transparent dark:from-blue-900/10 dark:to-transparent pointer-events-none"></div>
-      
-      <div class="max-w-6xl mx-auto px-8 py-8 relative z-10">
-        {% block content %}{% endblock %}
-      </div>
-    </main>
-    
+    <div class="flex min-w-0 flex-1 flex-col">
+      <header class="mobile-bar lg:hidden">
+        <div class="brand-mark">
+          <div class="brand-badge">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M6 7.5h12M6 12h9m-9 4.5h7"></path>
+            </svg>
+          </div>
+          <div>
+            <p class="brand-title">Crawl Index</p>
+            <p class="text-[0.76rem] text-[#5d6a65]">Local ops dashboard</p>
+          </div>
+        </div>
+        <label for="nav-toggle" class="inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border border-[#1b322c]/10 bg-white/60 text-[#1b2a24] shadow-sm">
+          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7h16M4 12h16M4 17h16"></path>
+          </svg>
+        </label>
+      </header>
+
+      <main class="app-main">
+        <div class="app-main__glow app-main__glow--one"></div>
+        <div class="app-main__glow app-main__glow--two"></div>
+        <div class="app-main__inner">
+          {% block content %}{% endblock %}
+        </div>
+      </main>
+    </div>
   </div>
 </body>
 </html>

@@ -25,10 +25,12 @@ Cloudflare `/crawl` endpoint'i ile icerik toplayip yerelde indeksleyen, semantic
 uv sync
 cp .env.example .env
 uv run python -m scripts.bootstrap
-uv run uvicorn app.main:app --reload
+uv run crawl-index-server
 ```
 
 Open [http://127.0.0.1:8000/admin/sources](http://127.0.0.1:8000/admin/sources)
+
+When started through `crawl-index-server`, the local admin UI waits until the HTTP server is reachable and then opens automatically in your browser.
 
 ## Required Environment Variables
 
@@ -52,6 +54,8 @@ Or use the packaged script:
 ```bash
 uv run crawl-index-mcp
 ```
+
+The MCP process does not start the Web UI and does not open a browser tab. It only exposes MCP tools over stdio.
 
 Example MCP config:
 

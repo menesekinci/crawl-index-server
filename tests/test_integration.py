@@ -5,7 +5,7 @@ from sqlmodel import Session, SQLModel, create_engine, select
 
 from app.config import Settings
 from app.db.models import CrawlJob, Document, Source
-from app.main import ServiceContainer, create_app
+from app.main import ServiceContainer, create_app, run, start_ui_browser_thread, wait_for_ui_ready_and_open
 from app.services.jobs import CrawlCoordinator
 from app.services.search import SearchService
 from app.services.sources import SourceService
@@ -126,3 +126,117 @@ def test_source_to_search_flow(tmp_path: Path):
         results = search_res.json()
         assert len(results) == 1
         assert results[0]["title"] == "Getting Started"
+
+
+class StubResponse:
+    def __init__(self, status: int):
+        self.status = status
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+
+def test_wait_for_ui_ready_and_open_retries_until_ready():
+    opened_urls = []
+    attempts = {"count": 0}
+
+    def fake_urlopen(url, timeout):
+        attempts["count"] += 1
+        if attempts["count"] < 3:
+            raise OSError("not ready")
+        return StubResponse(200)
+
+    def fake_open_browser(url):
+        opened_urls.append(url)
+
+    result = wait_for_ui_ready_and_open(
+        "http://127.0.0.1:8000/admin/sources",
+        timeout_seconds=1,
+        poll_interval_seconds=0,
+        open_browser=fake_open_browser,
+        urlopen=fake_urlopen,
+        sleep=lambda _: None,
+        monotonic=lambda: attempts["count"] / 10,
+    )
+
+    assert result is True
+    assert opened_urls == ["http://127.0.0.1:8000/admin/sources"]
+    assert attempts["count"] == 3
+
+
+def test_wait_for_ui_ready_and_open_times_out_cleanly():
+    opened_urls = []
+    tick = {"value": 0}
+
+    def fake_urlopen(url, timeout):
+        raise OSError("still starting")
+
+    def fake_open_browser(url):
+        opened_urls.append(url)
+
+    def fake_monotonic():
+        current = tick["value"]
+        tick["value"] += 1
+        return current
+
+    result = wait_for_ui_ready_and_open(
+        "http://127.0.0.1:8000/admin/sources",
+        timeout_seconds=2,
+        poll_interval_seconds=0,
+        open_browser=fake_open_browser,
+        urlopen=fake_urlopen,
+        sleep=lambda _: None,
+        monotonic=fake_monotonic,
+    )
+
+    assert result is False
+    assert opened_urls == []
+
+
+def test_start_ui_browser_thread_uses_admin_url(tmp_path: Path):
+    settings, _, _ = build_test_container(tmp_path)
+    seen = {}
+
+    def fake_wait_for_ui_ready_and_open(url: str) -> bool:
+        seen["url"] = url
+        return True
+
+    import app.main as main_module
+
+    original = main_module.wait_for_ui_ready_and_open
+    main_module.wait_for_ui_ready_and_open = fake_wait_for_ui_ready_and_open
+    try:
+        thread = start_ui_browser_thread(settings)
+        thread.join(timeout=1)
+    finally:
+        main_module.wait_for_ui_ready_and_open = original
+
+    assert seen["url"] == f"http://{settings.app_host}:{settings.app_port}/admin/sources"
+
+
+def test_run_starts_browser_thread_before_uvicorn(monkeypatch, tmp_path: Path):
+    settings, _, _ = build_test_container(tmp_path)
+    calls = []
+
+    def fake_get_settings():
+        return settings
+
+    def fake_start_ui_browser_thread(runtime_settings):
+        calls.append(("thread", runtime_settings.app_port))
+
+    def fake_uvicorn_run(app_path, host, port, reload):
+        calls.append(("uvicorn", app_path, host, port, reload))
+
+    monkeypatch.setattr("app.main.get_settings", fake_get_settings)
+    monkeypatch.setattr("app.main.start_ui_browser_thread", fake_start_ui_browser_thread)
+    monkeypatch.setattr("app.main.uvicorn.run", fake_uvicorn_run)
+
+    run()
+
+    assert calls == [
+        ("thread", settings.app_port),
+        ("uvicorn", "app.main:app", settings.app_host, settings.app_port, False),
+    ]

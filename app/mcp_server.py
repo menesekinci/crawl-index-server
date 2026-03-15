@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import webbrowser
-from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any
 
@@ -189,25 +187,7 @@ def create_mcp_container() -> MCPContainer:
 def create_mcp_server(container: MCPContainer | None = None) -> FastMCP:
     runtime = container or create_mcp_container()
     adapter = CrawlIndexMCPAdapter(runtime)
-
-    @asynccontextmanager
-    async def lifespan(_: FastMCP):
-        try:
-            # Auto-open Web UI when MCP starts
-            settings = get_settings()
-            ui_url = f"http://{settings.app_host}:{settings.app_port}/admin/sources"
-            
-            # Start the fastAPI server if not running is tricky from here, 
-            # but we assume they run via uvicorn and this is just the client or the MCP also mounts it.
-            # Actually, the user runs the FastAPI app and MCP separately or FastMCP might not serve the UI directly.
-            # Assuming the Web UI is up, we just open the tab.
-            webbrowser.open_new_tab(ui_url)
-            
-            yield runtime
-        finally:
-            runtime.close()
-
-    mcp = FastMCP("crawl-index", lifespan=lifespan)
+    mcp = FastMCP("crawl-index")
 
     @mcp.tool()
     def list_sources(enabled_only: bool = False) -> list[dict[str, Any]]:
