@@ -6,4 +6,8 @@ __pycache__/
 .env
 .DS_Store
 .data/
+qdrant
+qdrant.tar.gz
+.qdrant-initialized
+storage/
 

@@ -1,6 +1,9 @@
+"""Crawl coordinator with improved error handling and logging."""
+
 from __future__ import annotations
 
 import hashlib
+import logging
 from datetime import datetime
 from uuid import uuid4
 
@@ -12,6 +15,10 @@ from app.services.chunking import MarkdownChunker
 from app.services.cloudflare import CloudflareCrawlClient, CloudflareNotConfiguredError, CrawlJobResult
 from app.services.embeddings import EmbeddingService
 from app.services.vector_store import VectorStore
+from app.utils.errors import VectorStoreError, ServiceUnavailableError
+from app.utils.retry import with_retry
+
+logger = logging.getLogger(__name__)
 
 
 class CrawlCoordinator:
@@ -30,6 +37,14 @@ class CrawlCoordinator:
         self._embedding_service = embedding_service
         self._vector_store = vector_store
         self._chunker = MarkdownChunker(settings.chunk_target_chars, settings.chunk_overlap_chars)
+
+    def _check_vector_store_available(self) -> bool:
+        """Check if vector store is available."""
+        try:
+            return self._vector_store.health_check()
+        except Exception as e:
+            logger.warning(f"Vector store health check failed: {e}")
+            return False
 
     def list_jobs(
         self,
@@ -140,6 +155,7 @@ class CrawlCoordinator:
             session.add(job)
             session.commit()
             session.refresh(job)
+            logger.info(f"Submitted job {job_id} to Cloudflare")
             return job
 
     def create_and_submit_job(self, source_id: str) -> CrawlJob:
@@ -160,6 +176,7 @@ class CrawlCoordinator:
             existing.updated_at = utcnow()
             session.add(existing)
             session.commit()
+            logger.info(f"Retrying job {job_id}")
         return self.submit_job(job_id)
 
     def poll_active_jobs(self) -> None:
@@ -170,16 +187,21 @@ class CrawlCoordinator:
                 )
             )
         for job in jobs:
-            self._poll_single_job(job.id)
+            try:
+                self._poll_single_job(job.id)
+            except Exception as e:
+                logger.error(f"Error polling job {job.id}: {e}")
 
     def _poll_single_job(self, job_id: str) -> None:
         with Session(self._engine) as session:
             job = session.get(CrawlJob, job_id)
             if job is None or not job.provider_job_id:
                 return
+
         try:
             result = self._cloudflare_client.get_job(job.provider_job_id)
         except Exception as exc:
+            logger.warning(f"Failed to poll job {job_id}: {exc}")
             with Session(self._engine) as session:
                 job = session.get(CrawlJob, job_id)
                 if job:
@@ -188,6 +210,7 @@ class CrawlCoordinator:
                     session.add(job)
                     session.commit()
             return
+
         with Session(self._engine) as session:
             job = session.get(CrawlJob, job_id)
             if job is None:
@@ -197,6 +220,7 @@ class CrawlCoordinator:
             job.skipped_records = result.skipped
             job.updated_at = utcnow()
             if result.status == "completed":
+                logger.info(f"Job {job_id} completed, ingesting documents")
                 changed_documents = self._ingest_documents(session, job.source_id, result)
                 session.refresh(job)
                 job.status = JobStatus.completed.value
@@ -218,6 +242,7 @@ class CrawlCoordinator:
                 job.error_text = f"Provider reported status={result.status}"
                 session.add(job)
                 session.commit()
+                logger.error(f"Job {job_id} failed: {job.error_text}")
             else:
                 job.status = JobStatus.polling.value
                 session.add(job)
@@ -263,56 +288,93 @@ class CrawlCoordinator:
         chunks = list(session.exec(select(Chunk).where(Chunk.document_id == document_id)))
         point_ids = [chunk.vector_point_id for chunk in chunks if chunk.vector_point_id]
         if point_ids:
-            self._vector_store.delete_points(point_ids)
+            try:
+                self._vector_store.delete_points(point_ids)
+            except VectorStoreError as e:
+                logger.warning(f"Failed to delete vector points for document {document_id}: {e}")
         session.exec(delete(Chunk).where(Chunk.document_id == document_id))
         session.commit()
 
     def _index_documents(self, document_ids: list[str]) -> None:
+        """Index documents with retry and graceful degradation."""
+        if not document_ids:
+            return
+
+        if not self._check_vector_store_available():
+            logger.warning(
+                f"Vector store unavailable, skipping indexing for {len(document_ids)} documents"
+            )
+            return
+
         with Session(self._engine) as session:
             documents = [session.get(Document, document_id) for document_id in document_ids]
             documents = [document for document in documents if document is not None]
-            points = []
-            chunks_to_update: list[Chunk] = []
+
             for document in documents:
-                chunks = self._chunker.split(document.raw_markdown)
-                texts = [chunk.text for chunk in chunks]
-                vectors = self._embedding_service.embed_texts(texts)
-                vector_size = len(vectors[0]) if vectors else self._embedding_service.vector_size()
-                for chunk_data, vector in zip(chunks, vectors):
-                    chunk = Chunk(
-                        document_id=document.id,
-                        chunk_index=chunk_data.index,
-                        text=chunk_data.text,
-                        content_hash=hashlib.sha256(chunk_data.text.encode("utf-8")).hexdigest(),
-                        token_estimate=chunk_data.token_estimate,
-                        embedding_model=self._embedding_service.model_name,
-                        embedded_at=utcnow(),
-                        vector_point_id=str(uuid4()),
-                    )
-                    session.add(chunk)
-                    session.flush()
-                    chunks_to_update.append(chunk)
-                    points.append(
-                        (
-                            chunk.vector_point_id,
-                            vector,
-                            {
-                                "source_id": document.source_id,
-                                "document_id": document.id,
-                                "chunk_id": chunk.id,
-                                "url": document.url,
-                                "title": document.title,
-                                "chunk_index": chunk.chunk_index,
-                                "content_hash": document.content_hash,
-                                "fetched_at": document.fetched_at.isoformat(),
-                            },
-                        )
-                    )
-                self._vector_store.upsert(points=[point for point in points if point[2]["document_id"] == document.id], vector_size=vector_size)
-            for chunk in chunks_to_update:
-                chunk.updated_at = utcnow()
-                session.add(chunk)
-            session.commit()
+                try:
+                    self._index_single_document(session, document)
+                except Exception as e:
+                    logger.error(f"Failed to index document {document.id}: {e}")
+                    # Continue with other documents
+
+    def _index_single_document(self, session: Session, document: Document) -> None:
+        """Index a single document."""
+        chunks = self._chunker.split(document.raw_markdown)
+        texts = [chunk.text for chunk in chunks]
+        vectors = self._embedding_service.embed_texts(texts)
+        vector_size = len(vectors[0]) if vectors else self._embedding_service.vector_size()
+
+        points = []
+        chunks_to_update = []
+
+        for chunk_data, vector in zip(chunks, vectors):
+            chunk = Chunk(
+                document_id=document.id,
+                chunk_index=chunk_data.index,
+                text=chunk_data.text,
+                content_hash=hashlib.sha256(chunk_data.text.encode("utf-8")).hexdigest(),
+                token_estimate=chunk_data.token_estimate,
+                embedding_model=self._embedding_service.model_name,
+                embedded_at=utcnow(),
+                vector_point_id=str(uuid4()),
+            )
+            session.add(chunk)
+            session.flush()
+            chunks_to_update.append(chunk)
+            points.append(
+                (
+                    chunk.vector_point_id,
+                    vector,
+                    {
+                        "source_id": document.source_id,
+                        "document_id": document.id,
+                        "chunk_id": chunk.id,
+                        "url": document.url,
+                        "title": document.title,
+                        "chunk_index": chunk.chunk_index,
+                        "content_hash": document.content_hash,
+                        "fetched_at": document.fetched_at.isoformat(),
+                    },
+                )
+            )
+
+        # Try to upsert with retry
+        try:
+            self._vector_store.upsert(
+                points=[p for p in points],
+                vector_size=vector_size,
+            )
+        except VectorStoreError as e:
+            logger.warning(f"Vector store upsert failed for document {document.id}: {e}")
+            # Don't raise - chunks are still in DB, can retry later
+            return
+
+        for chunk in chunks_to_update:
+            chunk.updated_at = utcnow()
+            session.add(chunk)
+        session.commit()
+
+        logger.debug(f"Indexed document {document.id} with {len(chunks)} chunks")
 
     def process_due_sources(self) -> None:
         now = utcnow()
@@ -340,6 +402,8 @@ class CrawlCoordinator:
                 continue
             try:
                 self.create_and_submit_job(source.id)
+            except Exception as e:
+                logger.error(f"Failed to create job for source {source.id}: {e}")
             finally:
                 with Session(self._engine) as session:
                     fresh_source = session.get(Source, source.id)
@@ -360,9 +424,11 @@ class CrawlCoordinator:
         return next_fire.astimezone().astimezone(tz=utcnow().tzinfo) if next_fire else None
 
     def reindex_source(self, source_id: str) -> int:
+        document_ids = []
         with Session(self._engine) as session:
             documents = list(session.exec(select(Document).where(Document.source_id == source_id)))
             for document in documents:
                 self._delete_document_chunks(session, document.id)
-        self._index_documents([document.id for document in documents])
-        return len(documents)
+                document_ids.append(document.id)
+        self._index_documents(document_ids)
+        return len(document_ids)

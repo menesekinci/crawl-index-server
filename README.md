@@ -1,78 +1,189 @@
-# Crawl Index Server
+# 🚀 Crawl Index Server
 
-Cloudflare `/crawl` endpoint'i ile icerik toplayip yerelde indeksleyen, semantic search icin embedding ureten local-first mini sunucu.
+> Local-first semantic search sunucusu — web sitelerinden içerik topla, indeksle, ara
 
-## What It Does
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-green.svg)](https://fastapi.tiangolo.com)
+[![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 
-- Starts Cloudflare crawl jobs for documentation-heavy sites
-- Polls crawl job progress until completion
-- Stores fetched markdown locally in SQLite
-- Chunks and embeds changed documents only
-- Indexes vectors in local Qdrant storage
-- Exposes REST endpoints and a small admin UI for sources, jobs, documents, and search
+---
 
-## Stack
+## ✨ Ne İşe Yarar?
 
-- FastAPI
-- SQLite
-- Qdrant local mode
-- APScheduler
-- sentence-transformers
+Bir web sitesinin dokümantasyonunu çekip **kendi local AI bilgi tabanına** dönüştürür.
 
-## Setup
+```
+🌐 Web Sitesi  ──▶  📦 Cloudflare Crawl  ──▶  💾 SQLite  ──▶  🧠 Embeddings  ──▶  🔍 Semantic Search
+```
+
+### Özellikleri
+
+| Özellik | Açıklama |
+|----------|----------|
+| 🔄 **Otomatik Crawl** | Cloudflare'ın browser rendering ile sayfaları çeker |
+| 💾 **Local Storage** | SQLite'da markdown olarak saklar |
+| 🧠 **Embedding** | Sentence-transformers ile vektörleştirir |
+| 🔍 **Semantic Search** | Qdrant ile hızlı vektör araması |
+| 🤖 **MCP Server** | AI ajanları için stdio tabanlı tool'lar |
+| 🎨 **Admin UI** | Tarayıcıda görsel yönetim paneli |
+
+---
+
+## 🛠️ Kurulum
 
 ```bash
+# 1. Dependencies yükle
 uv sync
+
+# 2. Environment dosyası oluştur
 cp .env.example .env
-uv run python -m scripts.bootstrap
+
+# 3. Başlat
 uv run crawl-index-server
 ```
 
-Open [http://127.0.0.1:8000/admin/sources](http://127.0.0.1:8000/admin/sources)
+> 💡 **İpucu:** Server başladığında tarayıcı otomatik açılır!
 
-When started through `crawl-index-server`, the local admin UI waits until the HTTP server is reachable and then opens automatically in your browser.
+**Adres:** [http://127.0.0.1:8000/admin/sources](http://127.0.0.1:8000/admin/sources)
 
-## Required Environment Variables
+---
 
-- `CF_ACCOUNT_ID`
-- `CF_API_TOKEN`
+## ⚙️ Environment Değişkenleri
 
-Without Cloudflare credentials the UI and search still work, but crawl submission stays disabled.
+```env
+# Cloudflare Browser Rendering (crawl için gerekli)
+CF_ACCOUNT_ID=your_account_id
+CF_API_TOKEN=your_api_token
 
-## MCP Setup
-
-The repository also exposes a local `stdio` MCP server that uses the same SQLite and Qdrant data.
-
-Run it directly:
-
-```bash
-uv run python -m app.mcp_server
+# Opsiyonel (defaults gösteriliyor)
+APP_HOST=127.0.0.1
+APP_PORT=8000
+QDRANT_URL=http://127.0.0.1:6333
+EMBEDDING_MODEL=intfloat/multilingual-e5-small
 ```
 
-Or use the packaged script:
+> ⚠️ Cloudflare olmadan crawl çalışmaz ama arama ve yönetim paneline erişebilirsin.
 
-```bash
-uv run crawl-index-mcp
-```
+---
 
-The MCP process does not start the Web UI and does not open a browser tab. It only exposes MCP tools over stdio.
+## 🤖 MCP Server
 
-Example MCP config:
+AI ajanları için tam teşekküllü MCP server!
+
+### Kurulum
 
 ```json
 {
   "mcpServers": {
     "crawl-index": {
       "command": "uv",
-      "args": [
-        "--directory",
-        "/ABSOLUTE/PATH/TO/crawl-index-server",
-        "run",
-        "python",
-        "-m",
-        "app.mcp_server"
-      ]
+      "args": ["--directory", "/path/to/crawl-index-server", "run", "python", "-m", "app.mcp_server"]
     }
   }
 }
 ```
+
+### Kullanılabilir Tool'lar
+
+| Tool | Açıklama |
+|------|----------|
+| `search_docs` | 📚 Indexed dokümanlarda semantic arama |
+| `list_sources` | 📋 Tüm crawl kaynaklarını listele |
+| `create_source` | ➕ Yeni kaynak ekle |
+| `trigger_crawl` | ▶️ Crawl başlat |
+| `reindex_source` | 🔄 Kaynağı yeniden indeksle |
+| `list_jobs` | 📊 Crawl işlerini görüntüle |
+| `get_job` | 🔎 İş detaylarını al |
+| `retry_job` | 🔁 Başarısız işi yeniden dene |
+| `health_check` | 💚 Sistem sağlığını kontrol et |
+
+### Örnek Kullanım
+
+```python
+# AI ajanı dokümantasyonda arıyor
+result = search_docs(query="Next.js App Router nasıl çalışır?", limit=5)
+
+# Yeni bir site ekle
+result = create_source(
+    name="React Docs",
+    start_url="https://react.dev/docs",
+    allowed_domains=["react.dev"],
+    crawl_depth=2
+)
+
+# İçerik güncelleme
+result = reindex_source(source_id="abc-123")
+```
+
+---
+
+## 🏗️ Mimari
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                     crawl-index-server                   │
+├─────────────────────────────────────────────────────────┤
+│                                                          │
+│   ┌─────────────┐    ┌─────────────┐    ┌───────────┐ │
+│   │   FastAPI   │    │  Scheduler  │    │  MCP      │ │
+│   │   REST API  │    │  (APScheduler)│    │  Server   │ │
+│   └──────┬──────┘    └──────┬──────┘    └─────┬─────┘ │
+│          │                   │                   │       │
+│   ┌──────┴───────────────────┴───────────────────┴─────┐ │
+│   │              Service Container                      │ │
+│   │  ┌────────────┐  ┌───────────┐  ┌─────────────┐  │ │
+│   │  │  Source    │  │   Crawl   │  │   Search    │  │ │
+│   │  │  Service   │  │ Coordinator│  │   Service   │  │ │
+│   │  └────────────┘  └───────────┘  └─────────────┘  │ │
+│   └──────────────────────┬────────────────────────────┘ │
+│                          │                              │
+│   ┌──────────────────────┴────────────────────────────┐ │
+│   │                  Vector Store                      │ │
+│   │   ┌─────────────┐          ┌─────────────────┐   │ │
+│   │   │  Embedding  │          │  Qdrant Client  │   │ │
+│   │   │  Service   │          │  (HTTP/REST)    │   │ │
+│   │   └─────────────┘          └────────┬────────┘   │ │
+│   └─────────────────────────────────────┼────────────┘ │
+│                                          │              │
+└──────────────────────────────────────────┼──────────────┘
+                                           │
+                              ┌─────────────┴────────────┐
+                              │      Qdrant Server       │
+                              │    (Vector Storage)      │
+                              └──────────────────────────┘
+```
+
+---
+
+## 📦 Teknoloji Stack
+
+| Katman | Teknoloji |
+|--------|-----------|
+| 🌐 API | FastAPI + Uvicorn |
+| 📊 Database | SQLite + SQLModel |
+| 🧠 Embeddings | sentence-transformers |
+| 🔍 Vector Store | Qdrant |
+| 📝 UI | Jinja2 Templates |
+| 🤖 AI Integration | MCP (Model Context Protocol) |
+| ⏰ Jobs | APScheduler |
+
+---
+
+## 🧪 Geliştirme
+
+```bash
+# Test çalıştır
+uv run pytest
+
+# Kod formatle
+uv run ruff format .
+
+# Lint kontrol
+uv run ruff check .
+```
+
+---
+
+## 📝 Lisans
+
+MIT License - detaylar için [LICENSE](LICENSE) dosyasına bak.

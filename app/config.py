@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     app_port: int = 8000
     database_url: str = "sqlite:///.data/app.db"
     qdrant_path: str = ".data/qdrant"
+    qdrant_url: str | None = None  # If set, use HTTP transport (e.g., "http://127.0.0.1:6333")
     embedding_model: str = "intfloat/multilingual-e5-small"
     embedding_cache_dir: str = ".data/models"
     cf_account_id: str | None = None
