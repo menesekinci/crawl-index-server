@@ -1,6 +1,6 @@
 # 🚀 Crawl Index Server
 
-> Local-first semantic search sunucusu — web sitelerinden içerik topla, indeksle, ara
+> Local-first semantic search server — crawl websites, index content, and search with AI
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-green.svg)](https://fastapi.tiangolo.com)
@@ -8,69 +8,69 @@
 
 ---
 
-## ✨ Ne İşe Yarar?
+## ✨ What It Does
 
-Bir web sitesinin dokümantasyonunu çekip **kendi local AI bilgi tabanına** dönüştürür.
+Turns any website's documentation into your **own local AI knowledge base**.
 
 ```
-🌐 Web Sitesi  ──▶  📦 Cloudflare Crawl  ──▶  💾 SQLite  ──▶  🧠 Embeddings  ──▶  🔍 Semantic Search
+🌐 Website  ──▶  📦 Cloudflare Crawl  ──▶  💾 SQLite  ──▶  🧠 Embeddings  ──▶  🔍 Semantic Search
 ```
 
-### Özellikleri
+### Features
 
-| Özellik | Açıklama |
-|----------|----------|
-| 🔄 **Otomatik Crawl** | Cloudflare'ın browser rendering ile sayfaları çeker |
-| 💾 **Local Storage** | SQLite'da markdown olarak saklar |
-| 🧠 **Embedding** | Sentence-transformers ile vektörleştirir |
-| 🔍 **Semantic Search** | Qdrant ile hızlı vektör araması |
-| 🤖 **MCP Server** | AI ajanları için stdio tabanlı tool'lar |
-| 🎨 **Admin UI** | Tarayıcıda görsel yönetim paneli |
+| Feature | Description |
+|----------|-------------|
+| 🔄 **Auto Crawl** | Cloudflare's browser rendering fetches pages |
+| 💾 **Local Storage** | Stores markdown in SQLite |
+| 🧠 **Embedding** | Vectorizes with sentence-transformers |
+| 🔍 **Semantic Search** | Fast vector search with Qdrant |
+| 🤖 **MCP Server** | Stdio-based tools for AI agents |
+| 🎨 **Admin UI** | Visual management panel in browser |
 
 ---
 
-## 🛠️ Kurulum
+## 🛠️ Setup
 
 ```bash
-# 1. Dependencies yükle
+# 1. Install dependencies
 uv sync
 
-# 2. Environment dosyası oluştur
+# 2. Create environment file
 cp .env.example .env
 
-# 3. Başlat
+# 3. Start server
 uv run crawl-index-server
 ```
 
-> 💡 **İpucu:** Server başladığında tarayıcı otomatik açılır!
+> 💡 **Tip:** Server automatically opens browser when started!
 
-**Adres:** [http://127.0.0.1:8000/admin/sources](http://127.0.0.1:8000/admin/sources)
+**URL:** [http://127.0.0.1:8000/admin/sources](http://127.0.0.1:8000/admin/sources)
 
 ---
 
-## ⚙️ Environment Değişkenleri
+## ⚙️ Environment Variables
 
 ```env
-# Cloudflare Browser Rendering (crawl için gerekli)
+# Cloudflare Browser Rendering (required for crawl)
 CF_ACCOUNT_ID=your_account_id
 CF_API_TOKEN=your_api_token
 
-# Opsiyonel (defaults gösteriliyor)
+# Optional (defaults shown)
 APP_HOST=127.0.0.1
 APP_PORT=8000
 QDRANT_URL=http://127.0.0.1:6333
 EMBEDDING_MODEL=intfloat/multilingual-e5-small
 ```
 
-> ⚠️ Cloudflare olmadan crawl çalışmaz ama arama ve yönetim paneline erişebilirsin.
+> ⚠️ Without Cloudflare credentials, crawl is disabled but search and admin UI still work.
 
 ---
 
 ## 🤖 MCP Server
 
-AI ajanları için tam teşekküllü MCP server!
+Full-featured MCP server for AI agents!
 
-### Kurulum
+### Installation
 
 ```json
 {
@@ -83,27 +83,27 @@ AI ajanları için tam teşekküllü MCP server!
 }
 ```
 
-### Kullanılabilir Tool'lar
+### Available Tools
 
-| Tool | Açıklama |
-|------|----------|
-| `search_docs` | 📚 Indexed dokümanlarda semantic arama |
-| `list_sources` | 📋 Tüm crawl kaynaklarını listele |
-| `create_source` | ➕ Yeni kaynak ekle |
-| `trigger_crawl` | ▶️ Crawl başlat |
-| `reindex_source` | 🔄 Kaynağı yeniden indeksle |
-| `list_jobs` | 📊 Crawl işlerini görüntüle |
-| `get_job` | 🔎 İş detaylarını al |
-| `retry_job` | 🔁 Başarısız işi yeniden dene |
-| `health_check` | 💚 Sistem sağlığını kontrol et |
+| Tool | Description |
+|------|-------------|
+| `search_docs` | 📚 Semantic search in indexed documents |
+| `list_sources` | 📋 List all crawl sources |
+| `create_source` | ➕ Add new source |
+| `trigger_crawl` | ▶️ Start crawl |
+| `reindex_source` | 🔄 Re-index a source |
+| `list_jobs` | 📊 View crawl jobs |
+| `get_job` | 🔎 Get job details |
+| `retry_job` | 🔁 Retry failed job |
+| `health_check` | 💚 Check system health |
 
-### Örnek Kullanım
+### Example Usage
 
 ```python
-# AI ajanı dokümantasyonda arıyor
-result = search_docs(query="Next.js App Router nasıl çalışır?", limit=5)
+# AI agent searching documentation
+result = search_docs(query="How does Next.js App Router work?", limit=5)
 
-# Yeni bir site ekle
+# Add new site
 result = create_source(
     name="React Docs",
     start_url="https://react.dev/docs",
@@ -111,43 +111,43 @@ result = create_source(
     crawl_depth=2
 )
 
-# İçerik güncelleme
+# Update content
 result = reindex_source(source_id="abc-123")
 ```
 
 ---
 
-## 🏗️ Mimari
+## 🏗️ Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                     crawl-index-server                   │
 ├─────────────────────────────────────────────────────────┤
 │                                                          │
-│   ┌─────────────┐    ┌─────────────┐    ┌───────────┐ │
-│   │   FastAPI   │    │  Scheduler  │    │  MCP      │ │
-│   │   REST API  │    │  (APScheduler)│    │  Server   │ │
-│   └──────┬──────┘    └──────┬──────┘    └─────┬─────┘ │
-│          │                   │                   │       │
-│   ┌──────┴───────────────────┴───────────────────┴─────┐ │
-│   │              Service Container                      │ │
-│   │  ┌────────────┐  ┌───────────┐  ┌─────────────┐  │ │
-│   │  │  Source    │  │   Crawl   │  │   Search    │  │ │
-│   │  │  Service   │  │ Coordinator│  │   Service   │  │ │
-│   │  └────────────┘  └───────────┘  └─────────────┘  │ │
-│   └──────────────────────┬────────────────────────────┘ │
-│                          │                              │
-│   ┌──────────────────────┴────────────────────────────┐ │
-│   │                  Vector Store                      │ │
+│   ┌─────────────┐    ┌─────────────┐    ┌───────────┐  │
+│   │   FastAPI  │    │  Scheduler  │    │  MCP      │  │
+│   │   REST API │    │  (APScheduler)│   │  Server   │  │
+│   └──────┬──────┘    └──────┬──────┘    └─────┬─────┘  │
+│          │                   │                   │        │
+│   ┌──────┴───────────────────┴───────────────────┴────┐ │
+│   │              Service Container                       │ │
+│   │  ┌────────────┐  ┌───────────┐  ┌─────────────┐   │ │
+│   │  │  Source   │  │   Crawl   │  │   Search    │   │ │
+│   │  │  Service  │  │ Coordinator│  │   Service   │   │ │
+│   │  └────────────┘  └───────────┘  └─────────────┘   │ │
+│   └──────────────────────┬───────────────────────────┘ │
+│                          │                               │
+│   ┌──────────────────────┴───────────────────────────┐ │
+│   │                  Vector Store                     │ │
 │   │   ┌─────────────┐          ┌─────────────────┐   │ │
-│   │   │  Embedding  │          │  Qdrant Client  │   │ │
-│   │   │  Service   │          │  (HTTP/REST)    │   │ │
+│   │   │  Embedding │          │  Qdrant Client  │   │ │
+│   │   │  Service   │          │  (HTTP/REST)   │   │ │
 │   │   └─────────────┘          └────────┬────────┘   │ │
 │   └─────────────────────────────────────┼────────────┘ │
-│                                          │              │
-└──────────────────────────────────────────┼──────────────┘
+│                                          │             │
+└──────────────────────────────────────────┼─────────────┘
                                            │
-                              ┌─────────────┴────────────┐
+                              ┌─────────────┴─────────────┐
                               │      Qdrant Server       │
                               │    (Vector Storage)      │
                               └──────────────────────────┘
@@ -155,10 +155,10 @@ result = reindex_source(source_id="abc-123")
 
 ---
 
-## 📦 Teknoloji Stack
+## 📦 Tech Stack
 
-| Katman | Teknoloji |
-|--------|-----------|
+| Layer | Technology |
+|-------|------------|
 | 🌐 API | FastAPI + Uvicorn |
 | 📊 Database | SQLite + SQLModel |
 | 🧠 Embeddings | sentence-transformers |
@@ -169,21 +169,21 @@ result = reindex_source(source_id="abc-123")
 
 ---
 
-## 🧪 Geliştirme
+## 🧪 Development
 
 ```bash
-# Test çalıştır
+# Run tests
 uv run pytest
 
-# Kod formatle
+# Format code
 uv run ruff format .
 
-# Lint kontrol
+# Lint
 uv run ruff check .
 ```
 
 ---
 
-## 📝 Lisans
+## 📝 License
 
-MIT License - detaylar için [LICENSE](LICENSE) dosyasına bak.
+MIT License - see [LICENSE](LICENSE) file for details.
