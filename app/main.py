@@ -91,7 +91,9 @@ def build_container(
 
     for attempt in range(max_retries):
         try:
-            logger.info(f"Building service container (attempt {attempt + 1}/{max_retries})...")
+            logger.info(
+                f"Building service container (attempt {attempt + 1}/{max_retries})..."
+            )
 
             # Create database engine
             engine = create_db_engine(settings)
@@ -138,6 +140,76 @@ def build_container(
 
     raise RuntimeError(
         f"Failed to initialize service container after {max_retries} attempts: {last_error}"
+    )
+
+
+def build_mcp_container(
+    settings: Settings | None = None,
+    max_retries: int = 1,
+) -> ServiceContainer:
+    """
+    Build a lightweight service container optimized for MCP stdio mode.
+
+    Skips scheduler initialization (no cron jobs needed in MCP mode)
+    and uses minimal retry count for faster startup.
+
+    Args:
+        settings: Optional settings object
+        max_retries: Maximum initialization retry attempts (default 1 for speed)
+
+    Returns:
+        Configured ServiceContainer (scheduler will be None)
+
+    Raises:
+        RuntimeError: If container cannot be initialized
+    """
+    settings = settings or get_settings()
+    last_error = None
+
+    for attempt in range(max_retries):
+        try:
+            logger.info(
+                f"Building MCP container (attempt {attempt + 1}/{max_retries})..."
+            )
+
+            engine = create_db_engine(settings)
+            init_db(engine)
+            logger.debug("Database initialized")
+
+            vector_store = VectorStore(settings)
+            embedding_service = EmbeddingService(settings, vector_store)
+            cloudflare_client = CloudflareCrawlClient(settings)
+            source_service = SourceService(engine, settings)
+            crawl_coordinator = CrawlCoordinator(
+                engine=engine,
+                settings=settings,
+                cloudflare_client=cloudflare_client,
+                embedding_service=embedding_service,
+                vector_store=vector_store,
+            )
+            search_service = SearchService(engine, embedding_service, vector_store)
+
+            container = ServiceContainer(
+                source_service=source_service,
+                crawl_coordinator=crawl_coordinator,
+                search_service=search_service,
+                scheduler=None,  # No scheduler in MCP mode
+                vector_store=vector_store,
+            )
+
+            logger.info("MCP container built successfully")
+            return container
+
+        except Exception as e:
+            last_error = e
+            logger.warning(
+                f"MCP container initialization failed (attempt {attempt + 1}/{max_retries}): {e}"
+            )
+            if attempt < max_retries - 1:
+                time.sleep(1)
+
+    raise RuntimeError(
+        f"Failed to initialize MCP container after {max_retries} attempts: {last_error}"
     )
 
 
@@ -220,4 +292,6 @@ def start_ui_browser_thread(settings: Settings) -> None:
 def run() -> None:
     settings = get_settings()
     start_ui_browser_thread(settings)
-    uvicorn.run("app.main:app", host=settings.app_host, port=settings.app_port, reload=False)
+    uvicorn.run(
+        "app.main:app", host=settings.app_host, port=settings.app_port, reload=False
+    )

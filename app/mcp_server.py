@@ -1,16 +1,17 @@
-"""MCP server with health checks, graceful errors, and daemon mode."""
+"""MCP server with lazy initialization to prevent stdio handshake timeout."""
 
 from __future__ import annotations
 
 import logging
 import sys
+import threading
 import time
 from dataclasses import dataclass
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from app.main import ServiceContainer, build_container
+from app.main import ServiceContainer, build_mcp_container
 from app.config import get_settings
 from app.services.daemon import DaemonLock, setup_logging, register_shutdown_handler
 
@@ -37,21 +38,101 @@ class MCPContainer:
         self.services.close()
 
 
+class LazyMCPContainer:
+    """
+    Lazily initializes the service container on first tool call.
+
+    This prevents the stdio handshake timeout by deferring heavy
+    initialization (DB, Qdrant, embeddings) until actually needed.
+    """
+
+    def __init__(self) -> None:
+        self._container: MCPContainer | None = None
+        self._lock = threading.Lock()
+        self._initializing = False
+        self._error: Exception | None = None
+
+    def _initialize(self) -> MCPContainer:
+        """Initialize the container. Must be called under _lock."""
+        if self._container is not None:
+            return self._container
+
+        if self._error is not None:
+            raise RuntimeError(
+                f"Container initialization previously failed: {self._error}"
+            )
+
+        self._initializing = True
+        try:
+            services = build_mcp_container()
+            self._container = MCPContainer(services=services)
+            logger.info("Lazy MCP container initialized")
+            return self._container
+        except Exception as e:
+            self._error = e
+            raise
+        finally:
+            self._initializing = False
+
+    def get(self, timeout: float = 30.0) -> MCPContainer:
+        """
+        Get the container, initializing if necessary.
+
+        Args:
+            timeout: Maximum time to wait for initialization
+
+        Returns:
+            Initialized MCPContainer
+
+        Raises:
+            RuntimeError: If initialization fails or times out
+        """
+        if self._container is not None:
+            return self._container
+
+        with self._lock:
+            if self._container is not None:
+                return self._container
+
+            start = time.monotonic()
+            while self._initializing:
+                if time.monotonic() - start > timeout:
+                    raise RuntimeError(
+                        f"Container initialization timed out after {timeout}s"
+                    )
+                time.sleep(0.1)
+
+            return self._initialize()
+
+    @property
+    def is_ready(self) -> bool:
+        return self._container is not None
+
+    def close(self) -> None:
+        if self._container:
+            try:
+                self._container.close()
+            except Exception as e:
+                logger.error(f"Error during lazy container cleanup: {e}")
+
+
 class CrawlIndexMCPAdapter:
-    def __init__(self, container: MCPContainer):
-        self._container = container
+    def __init__(self, lazy_container: LazyMCPContainer):
+        self._lazy = lazy_container
+
+    def _get_container(self) -> MCPContainer:
+        return self._lazy.get()
 
     def _poll_before_read(self) -> None:
         """Poll active jobs with error handling."""
         try:
-            self._container.refresh_jobs()
+            self._get_container().refresh_jobs()
         except Exception as e:
             logger.warning(f"Poll before read failed: {e}")
-            # Continue anyway - don't block reads
 
     def _health_check(self) -> dict[str, bool]:
         """Get health status of all services."""
-        return self._container.health_check()
+        return self._get_container().health_check()
 
     @staticmethod
     def _iso(value: Any) -> Any:
@@ -60,15 +141,10 @@ class CrawlIndexMCPAdapter:
         return value
 
     def list_sources(self, enabled_only: bool = False) -> dict[str, Any]:
-        """
-        List available crawl sources.
-
-        Returns:
-            Dict with 'sources' key containing list of sources, or 'error' key on failure.
-        """
         try:
             self._poll_before_read()
-            sources = self._container.services.source_service.list_sources(enabled_only=enabled_only)
+            services = self._get_container().services
+            sources = services.source_service.list_sources(enabled_only=enabled_only)
             return {
                 "sources": [
                     {
@@ -77,8 +153,12 @@ class CrawlIndexMCPAdapter:
                         "start_url": source.start_url,
                         "enabled": source.enabled,
                         "cron_expr": source.cron_expr,
-                        "next_run_at": self._iso(source.next_run_at) if source.next_run_at else None,
-                        "last_success_at": self._iso(source.last_success_at) if source.last_success_at else None,
+                        "next_run_at": self._iso(source.next_run_at)
+                        if source.next_run_at
+                        else None,
+                        "last_success_at": self._iso(source.last_success_at)
+                        if source.last_success_at
+                        else None,
                     }
                     for source in sources
                 ]
@@ -88,10 +168,10 @@ class CrawlIndexMCPAdapter:
             return {"error": str(e), "sources": []}
 
     def get_source(self, source_id: str) -> dict[str, Any]:
-        """Get one source with crawl defaults and scheduling metadata."""
         try:
             self._poll_before_read()
-            source = self._container.services.source_service.get_source(source_id)
+            services = self._get_container().services
+            source = services.source_service.get_source(source_id)
             if source is None:
                 return {"error": "Source not found", "source_id": source_id}
             return {
@@ -106,17 +186,21 @@ class CrawlIndexMCPAdapter:
                 "crawl_limit": source.crawl_limit,
                 "render": source.render,
                 "formats": source.formats,
-                "next_run_at": self._iso(source.next_run_at) if source.next_run_at else None,
-                "last_success_at": self._iso(source.last_success_at) if source.last_success_at else None,
+                "next_run_at": self._iso(source.next_run_at)
+                if source.next_run_at
+                else None,
+                "last_success_at": self._iso(source.last_success_at)
+                if source.last_success_at
+                else None,
             }
         except Exception as e:
             logger.error(f"get_source failed: {e}")
             return {"error": str(e), "source_id": source_id}
 
     def trigger_crawl(self, source_id: str) -> dict[str, Any]:
-        """Start a crawl job for a source and return the created local job identifiers."""
         try:
-            job = self._container.services.crawl_coordinator.create_and_submit_job(source_id)
+            services = self._get_container().services
+            job = services.crawl_coordinator.create_and_submit_job(source_id)
             return {
                 "job_id": job.id,
                 "provider_job_id": job.provider_job_id,
@@ -134,10 +218,10 @@ class CrawlIndexMCPAdapter:
         status: str | None = None,
         limit: int = 20,
     ) -> dict[str, Any]:
-        """List recent crawl jobs, with optional filtering by source and status."""
         try:
             self._poll_before_read()
-            jobs = self._container.services.crawl_coordinator.list_jobs(
+            services = self._get_container().services
+            jobs = services.crawl_coordinator.list_jobs(
                 source_id=source_id,
                 status=status,
                 limit=limit,
@@ -154,9 +238,15 @@ class CrawlIndexMCPAdapter:
                         "finished_records": job.finished_records,
                         "skipped_records": job.skipped_records,
                         "error_text": job.error_text,
-                        "submitted_at": self._iso(job.submitted_at) if job.submitted_at else None,
-                        "started_at": self._iso(job.started_at) if job.started_at else None,
-                        "finished_at": self._iso(job.finished_at) if job.finished_at else None,
+                        "submitted_at": self._iso(job.submitted_at)
+                        if job.submitted_at
+                        else None,
+                        "started_at": self._iso(job.started_at)
+                        if job.started_at
+                        else None,
+                        "finished_at": self._iso(job.finished_at)
+                        if job.finished_at
+                        else None,
                     }
                     for job in jobs
                 ]
@@ -166,10 +256,10 @@ class CrawlIndexMCPAdapter:
             return {"error": str(e), "jobs": []}
 
     def get_job(self, job_id: str) -> dict[str, Any]:
-        """Get one crawl job with current progress, timestamps, and error details."""
         try:
             self._poll_before_read()
-            job = self._container.services.crawl_coordinator.get_job(job_id)
+            services = self._get_container().services
+            job = services.crawl_coordinator.get_job(job_id)
             if job is None:
                 return {"error": "Job not found", "job_id": job_id}
             return {
@@ -186,7 +276,9 @@ class CrawlIndexMCPAdapter:
                 "finished_records": job.finished_records,
                 "skipped_records": job.skipped_records,
                 "error_text": job.error_text,
-                "submitted_at": self._iso(job.submitted_at) if job.submitted_at else None,
+                "submitted_at": self._iso(job.submitted_at)
+                if job.submitted_at
+                else None,
                 "started_at": self._iso(job.started_at) if job.started_at else None,
                 "finished_at": self._iso(job.finished_at) if job.finished_at else None,
             }
@@ -195,9 +287,9 @@ class CrawlIndexMCPAdapter:
             return {"error": str(e), "job_id": job_id}
 
     def retry_job(self, job_id: str) -> dict[str, Any]:
-        """Retry a failed job by re-submitting it to the crawl provider."""
         try:
-            job = self._container.services.crawl_coordinator.retry_job(job_id)
+            services = self._get_container().services
+            job = services.crawl_coordinator.retry_job(job_id)
             return {
                 "job_id": job.id,
                 "provider_job_id": job.provider_job_id,
@@ -209,11 +301,13 @@ class CrawlIndexMCPAdapter:
             logger.error(f"retry_job failed: {e}")
             return {"error": str(e), "job_id": job_id}
 
-    def list_documents(self, source_id: str | None = None, limit: int = 20) -> dict[str, Any]:
-        """List recently fetched documents, optionally filtered to a single source."""
+    def list_documents(
+        self, source_id: str | None = None, limit: int = 20
+    ) -> dict[str, Any]:
         try:
             self._poll_before_read()
-            documents = self._container.services.crawl_coordinator.list_documents(
+            services = self._get_container().services
+            documents = services.crawl_coordinator.list_documents(
                 source_id=source_id,
                 limit=limit,
             )
@@ -240,12 +334,15 @@ class CrawlIndexMCPAdapter:
         include_markdown: bool = False,
         max_chars: int = 4000,
     ) -> dict[str, Any]:
-        """Get document metadata and a bounded preview; optionally include truncated markdown."""
         try:
             self._poll_before_read()
             if max_chars < 1:
-                return {"error": "max_chars must be at least 1", "document_id": document_id}
-            payload = self._container.services.crawl_coordinator.get_document_payload(
+                return {
+                    "error": "max_chars must be at least 1",
+                    "document_id": document_id,
+                }
+            services = self._get_container().services
+            payload = services.crawl_coordinator.get_document_payload(
                 document_id,
                 include_markdown=include_markdown,
                 max_chars=max_chars,
@@ -263,10 +360,10 @@ class CrawlIndexMCPAdapter:
         limit: int = 10,
         source_id: str | None = None,
     ) -> dict[str, Any]:
-        """Run semantic search over indexed documents and return snippets with source context."""
         try:
             self._poll_before_read()
-            results = self._container.services.search_service.search(
+            services = self._get_container().services
+            results = services.search_service.search(
                 query=query,
                 limit=limit,
                 source_id=source_id,
@@ -287,10 +384,10 @@ class CrawlIndexMCPAdapter:
         render: bool = False,
         formats: list[str] | None = None,
     ) -> dict[str, Any]:
-        """Create a new crawl source."""
         if formats is None:
             formats = ["markdown"]
         try:
+            services = self._get_container().services
             payload = {
                 "name": name,
                 "start_url": start_url,
@@ -301,7 +398,7 @@ class CrawlIndexMCPAdapter:
                 "render": render,
                 "formats": formats,
             }
-            source = self._container.services.source_service.create_source(payload)
+            source = services.source_service.create_source(payload)
             return {
                 "source_id": source.id,
                 "name": source.name,
@@ -313,9 +410,9 @@ class CrawlIndexMCPAdapter:
             return {"error": str(e)}
 
     def reindex_source(self, source_id: str) -> dict[str, Any]:
-        """Re-index all documents for a source (useful after content updates)."""
         try:
-            count = self._container.services.crawl_coordinator.reindex_source(source_id)
+            services = self._get_container().services
+            count = services.crawl_coordinator.reindex_source(source_id)
             return {
                 "source_id": source_id,
                 "documents_reindexed": count,
@@ -325,7 +422,6 @@ class CrawlIndexMCPAdapter:
             return {"error": str(e), "source_id": source_id}
 
     def get_health_status(self) -> dict[str, Any]:
-        """Get health status of all services."""
         try:
             health = self._health_check()
             return {
@@ -337,31 +433,8 @@ class CrawlIndexMCPAdapter:
             return {"healthy": False, "error": str(e)}
 
 
-def create_mcp_container(max_retries: int = 3) -> MCPContainer:
-    """Create MCP container with retry logic for initialization."""
-    last_error = None
-
-    for attempt in range(max_retries):
-        try:
-            container = MCPContainer(services=build_container())
-            # Quick health check to verify initialization
-            container.health_check()
-            logger.info(f"MCP container initialized (attempt {attempt + 1})")
-            return container
-        except Exception as e:
-            last_error = e
-            logger.warning(
-                f"Container initialization failed (attempt {attempt + 1}/{max_retries}): {e}"
-            )
-            if attempt < max_retries - 1:
-                time.sleep(2**attempt)  # Exponential backoff
-
-    raise RuntimeError(f"Failed to initialize container after {max_retries} attempts: {last_error}")
-
-
-def create_mcp_server(container: MCPContainer | None = None) -> FastMCP:
-    runtime = container or create_mcp_container()
-    adapter = CrawlIndexMCPAdapter(runtime)
+def create_mcp_server(lazy_container: LazyMCPContainer) -> FastMCP:
+    adapter = CrawlIndexMCPAdapter(lazy_container)
     mcp = FastMCP("crawl-index")
 
     @mcp.tool()
@@ -417,7 +490,9 @@ def create_mcp_server(container: MCPContainer | None = None) -> FastMCP:
         )
 
     @mcp.tool()
-    def search_docs(query: str, limit: int = 10, source_id: str | None = None) -> dict[str, Any]:
+    def search_docs(
+        query: str, limit: int = 10, source_id: str | None = None
+    ) -> dict[str, Any]:
         """Run semantic search over indexed documents and return snippets with source context."""
         return adapter.search_docs(query=query, limit=limit, source_id=source_id)
 
@@ -470,37 +545,31 @@ def create_mcp_server(container: MCPContainer | None = None) -> FastMCP:
 
 
 def run() -> None:
-    """Run the MCP server with daemon lock."""
+    """Run the MCP server with daemon lock and lazy initialization."""
     setup_logging()
     logger.info("Starting crawl-index MCP server...")
 
-    # Try to acquire daemon lock
+    # Try to acquire daemon lock with short timeout
     daemon_lock = DaemonLock()
-    if not daemon_lock.acquire(timeout=5.0):
+    if not daemon_lock.acquire(timeout=2.0):
         print("ERROR: Another MCP server instance is already running", file=sys.stderr)
         sys.exit(1)
 
     try:
-        # Register cleanup
-        container = None
+        # Create lazy container - does NOT initialize services yet
+        lazy_container = LazyMCPContainer()
 
         def cleanup():
-            nonlocal container
             logger.info("Cleaning up...")
-            if container:
-                try:
-                    container.close()
-                except Exception as e:
-                    logger.error(f"Error during cleanup: {e}")
+            lazy_container.close()
             daemon_lock.release()
 
         register_shutdown_handler(cleanup)
 
-        # Create and run server
-        container = create_mcp_container()
-        mcp_server = create_mcp_server(container)
+        # Create and run server - stdio starts IMMEDIATELY
+        mcp_server = create_mcp_server(lazy_container)
 
-        logger.info("MCP server running (stdio transport)")
+        logger.info("MCP server ready (stdio transport, lazy init)")
         mcp_server.run(transport="stdio")
 
     except Exception as e:
