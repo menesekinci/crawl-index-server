@@ -9,13 +9,16 @@ class Settings(BaseSettings):
     app_port: int = 8000
     database_url: str = "sqlite:///.data/app.db"
     qdrant_path: str = ".data/qdrant"
-    qdrant_url: str | None = None  # If set, use HTTP transport (e.g., "http://127.0.0.1:6333")
+    qdrant_url: str | None = (
+        None  # If set, use HTTP transport (e.g., "http://127.0.0.1:6333")
+    )
     embedding_model: str = "intfloat/multilingual-e5-small"
     embedding_cache_dir: str = ".data/models"
     cf_account_id: str | None = None
     cf_api_token: str | None = None
     poll_interval_seconds: int = 10
     scheduler_interval_seconds: int = 60
+    job_timeout_minutes: int = 30
     chunk_target_chars: int = 800
     chunk_overlap_chars: int = 120
     default_crawl_depth: int = 1
@@ -54,4 +57,3 @@ def get_settings() -> Settings:
     settings.qdrant_dir.mkdir(parents=True, exist_ok=True)
     settings.embedding_cache_path.mkdir(parents=True, exist_ok=True)
     return settings
-

@@ -12,7 +12,11 @@ from sqlmodel import Session, delete, select
 from app.config import Settings
 from app.db.models import Chunk, CrawlJob, Document, JobStatus, Source, utcnow
 from app.services.chunking import MarkdownChunker
-from app.services.cloudflare import CloudflareCrawlClient, CloudflareNotConfiguredError, CrawlJobResult
+from app.services.cloudflare import (
+    CloudflareCrawlClient,
+    CloudflareNotConfiguredError,
+    CrawlJobResult,
+)
 from app.services.embeddings import EmbeddingService
 from app.services.vector_store import VectorStore
 from app.utils.errors import VectorStoreError, ServiceUnavailableError
@@ -36,7 +40,9 @@ class CrawlCoordinator:
         self._cloudflare_client = cloudflare_client
         self._embedding_service = embedding_service
         self._vector_store = vector_store
-        self._chunker = MarkdownChunker(settings.chunk_target_chars, settings.chunk_overlap_chars)
+        self._chunker = MarkdownChunker(
+            settings.chunk_target_chars, settings.chunk_overlap_chars
+        )
 
     def _check_vector_store_available(self) -> bool:
         """Check if vector store is available."""
@@ -66,7 +72,9 @@ class CrawlCoordinator:
         with Session(self._engine) as session:
             return session.get(CrawlJob, job_id)
 
-    def list_documents(self, source_id: str | None = None, limit: int | None = 20) -> list[Document]:
+    def list_documents(
+        self, source_id: str | None = None, limit: int | None = 20
+    ) -> list[Document]:
         with Session(self._engine) as session:
             statement = select(Document).order_by(Document.fetched_at.desc())
             if source_id:
@@ -183,7 +191,11 @@ class CrawlCoordinator:
         with Session(self._engine) as session:
             jobs = list(
                 session.exec(
-                    select(CrawlJob).where(CrawlJob.status.in_([JobStatus.polling.value, JobStatus.submitted.value]))
+                    select(CrawlJob).where(
+                        CrawlJob.status.in_(
+                            [JobStatus.polling.value, JobStatus.submitted.value]
+                        )
+                    )
                 )
             )
         for job in jobs:
@@ -219,9 +231,12 @@ class CrawlCoordinator:
             job.finished_records = result.finished
             job.skipped_records = result.skipped
             job.updated_at = utcnow()
+
             if result.status == "completed":
                 logger.info(f"Job {job_id} completed, ingesting documents")
-                changed_documents = self._ingest_documents(session, job.source_id, result)
+                changed_documents = self._ingest_documents(
+                    session, job.source_id, result
+                )
                 session.refresh(job)
                 job.status = JobStatus.completed.value
                 job.finished_at = utcnow()
@@ -244,18 +259,74 @@ class CrawlCoordinator:
                 session.commit()
                 logger.error(f"Job {job_id} failed: {job.error_text}")
             else:
-                job.status = JobStatus.polling.value
-                session.add(job)
-                session.commit()
+                # Job still running - check for timeout
+                timeout_minutes = self._settings.job_timeout_minutes
+                elapsed = (
+                    (utcnow() - job.started_at).total_seconds() / 60
+                    if job.started_at
+                    else 0
+                )
 
-    def _ingest_documents(self, session: Session, source_id: str, result: CrawlJobResult) -> list[str]:
+                if elapsed > timeout_minutes:
+                    logger.warning(
+                        f"Job {job_id} timed out after {elapsed:.1f} minutes (limit: {timeout_minutes}min), ingesting {result.finished} completed records"
+                    )
+                    completed_records = [
+                        r
+                        for r in result.records
+                        if r.status == "completed" and r.markdown.strip()
+                    ]
+                    if completed_records:
+                        partial_result = CrawlJobResult(
+                            id=result.id,
+                            status="completed",
+                            total=result.finished,
+                            finished=result.finished,
+                            skipped=result.skipped,
+                            records=completed_records,
+                        )
+                        changed_documents = self._ingest_documents(
+                            session, job.source_id, partial_result
+                        )
+                        session.refresh(job)
+                        job.status = JobStatus.completed.value
+                        job.finished_at = utcnow()
+                        job.error_text = f"Timed out after {elapsed:.1f}min; ingested {len(completed_records)} of {result.total} records"
+                        session.add(job)
+                        source = session.get(Source, job.source_id)
+                        if source:
+                            source.last_run_at = utcnow()
+                            source.last_success_at = source.last_run_at
+                            source.updated_at = utcnow()
+                            session.add(source)
+                        session.commit()
+                        if changed_documents:
+                            self._index_documents(changed_documents)
+                    else:
+                        job.status = JobStatus.failed.value
+                        job.finished_at = utcnow()
+                        job.error_text = f"Timed out after {elapsed:.1f}min with no completed records"
+                        session.add(job)
+                        session.commit()
+                        logger.error(f"Job {job_id} timed out with no records")
+                else:
+                    # Still within timeout, keep polling
+                    job.status = JobStatus.polling.value
+                    session.add(job)
+                    session.commit()
+
+    def _ingest_documents(
+        self, session: Session, source_id: str, result: CrawlJobResult
+    ) -> list[str]:
         changed_document_ids: list[str] = []
         for record in result.records:
             if not record.markdown.strip():
                 continue
             content_hash = hashlib.sha256(record.markdown.encode("utf-8")).hexdigest()
             existing = session.exec(
-                select(Document).where(Document.source_id == source_id, Document.url == record.url)
+                select(Document).where(
+                    Document.source_id == source_id, Document.url == record.url
+                )
             ).first()
             if existing and existing.content_hash == content_hash:
                 existing.fetched_at = utcnow()
@@ -268,7 +339,12 @@ class CrawlCoordinator:
                 self._delete_document_chunks(session, existing.id)
                 document = existing
             else:
-                document = Document(source_id=source_id, url=record.url, content_hash=content_hash, raw_markdown="")
+                document = Document(
+                    source_id=source_id,
+                    url=record.url,
+                    content_hash=content_hash,
+                    raw_markdown="",
+                )
 
             document.canonical_url = record.metadata.get("url") or record.url
             document.title = record.title
@@ -285,13 +361,17 @@ class CrawlCoordinator:
         return changed_document_ids
 
     def _delete_document_chunks(self, session: Session, document_id: str) -> None:
-        chunks = list(session.exec(select(Chunk).where(Chunk.document_id == document_id)))
+        chunks = list(
+            session.exec(select(Chunk).where(Chunk.document_id == document_id))
+        )
         point_ids = [chunk.vector_point_id for chunk in chunks if chunk.vector_point_id]
         if point_ids:
             try:
                 self._vector_store.delete_points(point_ids)
             except VectorStoreError as e:
-                logger.warning(f"Failed to delete vector points for document {document_id}: {e}")
+                logger.warning(
+                    f"Failed to delete vector points for document {document_id}: {e}"
+                )
         session.exec(delete(Chunk).where(Chunk.document_id == document_id))
         session.commit()
 
@@ -307,7 +387,9 @@ class CrawlCoordinator:
             return
 
         with Session(self._engine) as session:
-            documents = [session.get(Document, document_id) for document_id in document_ids]
+            documents = [
+                session.get(Document, document_id) for document_id in document_ids
+            ]
             documents = [document for document in documents if document is not None]
 
             for document in documents:
@@ -322,7 +404,9 @@ class CrawlCoordinator:
         chunks = self._chunker.split(document.raw_markdown)
         texts = [chunk.text for chunk in chunks]
         vectors = self._embedding_service.embed_texts(texts)
-        vector_size = len(vectors[0]) if vectors else self._embedding_service.vector_size()
+        vector_size = (
+            len(vectors[0]) if vectors else self._embedding_service.vector_size()
+        )
 
         points = []
         chunks_to_update = []
@@ -332,7 +416,9 @@ class CrawlCoordinator:
                 document_id=document.id,
                 chunk_index=chunk_data.index,
                 text=chunk_data.text,
-                content_hash=hashlib.sha256(chunk_data.text.encode("utf-8")).hexdigest(),
+                content_hash=hashlib.sha256(
+                    chunk_data.text.encode("utf-8")
+                ).hexdigest(),
                 token_estimate=chunk_data.token_estimate,
                 embedding_model=self._embedding_service.model_name,
                 embedded_at=utcnow(),
@@ -365,7 +451,9 @@ class CrawlCoordinator:
                 vector_size=vector_size,
             )
         except VectorStoreError as e:
-            logger.warning(f"Vector store upsert failed for document {document.id}: {e}")
+            logger.warning(
+                f"Vector store upsert failed for document {document.id}: {e}"
+            )
             # Don't raise - chunks are still in DB, can retry later
             return
 
@@ -393,7 +481,13 @@ class CrawlCoordinator:
                 source_id
                 for source_id in session.exec(
                     select(CrawlJob.source_id).where(
-                        CrawlJob.status.in_([JobStatus.pending.value, JobStatus.submitted.value, JobStatus.polling.value])
+                        CrawlJob.status.in_(
+                            [
+                                JobStatus.pending.value,
+                                JobStatus.submitted.value,
+                                JobStatus.polling.value,
+                            ]
+                        )
                     )
                 )
             }
@@ -409,24 +503,36 @@ class CrawlCoordinator:
                     fresh_source = session.get(Source, source.id)
                     if fresh_source:
                         fresh_source.last_run_at = utcnow()
-                        fresh_source.next_run_at = self._compute_next_run(fresh_source.cron_expr, fresh_source.last_run_at)
+                        fresh_source.next_run_at = self._compute_next_run(
+                            fresh_source.cron_expr, fresh_source.last_run_at
+                        )
                         fresh_source.updated_at = utcnow()
                         session.add(fresh_source)
                         session.commit()
 
-    def _compute_next_run(self, cron_expr: str | None, start: datetime | None = None) -> datetime | None:
+    def _compute_next_run(
+        self, cron_expr: str | None, start: datetime | None = None
+    ) -> datetime | None:
         from apscheduler.triggers.cron import CronTrigger
 
         if not cron_expr:
             return None
-        trigger = CronTrigger.from_crontab(cron_expr, timezone=datetime.now().astimezone().tzinfo)
-        next_fire = trigger.get_next_fire_time(None, start or datetime.now().astimezone())
-        return next_fire.astimezone().astimezone(tz=utcnow().tzinfo) if next_fire else None
+        trigger = CronTrigger.from_crontab(
+            cron_expr, timezone=datetime.now().astimezone().tzinfo
+        )
+        next_fire = trigger.get_next_fire_time(
+            None, start or datetime.now().astimezone()
+        )
+        return (
+            next_fire.astimezone().astimezone(tz=utcnow().tzinfo) if next_fire else None
+        )
 
     def reindex_source(self, source_id: str) -> int:
         document_ids = []
         with Session(self._engine) as session:
-            documents = list(session.exec(select(Document).where(Document.source_id == source_id)))
+            documents = list(
+                session.exec(select(Document).where(Document.source_id == source_id))
+            )
             for document in documents:
                 self._delete_document_chunks(session, document.id)
                 document_ids.append(document.id)
