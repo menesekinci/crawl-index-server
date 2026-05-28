@@ -94,22 +94,25 @@ class CrawlCoordinator:
         include_markdown: bool = False,
         max_chars: int = 4000,
     ) -> dict | None:
+        import re
+        _clean = re.compile(r"[\u200b\u200c\u200d\u200e\u200f\u00ad\u2028\u2029\ufeff\u2060]+")
         document = self.get_document(document_id)
         if document is None:
             return None
-        preview = document.raw_markdown[:max_chars]
+        raw = _clean.sub("", document.raw_markdown)
+        preview = raw[:max_chars]
         payload = {
             "id": document.id,
             "source_id": document.source_id,
             "url": document.url,
             "canonical_url": document.canonical_url,
-            "title": document.title,
+            "title": _clean.sub("", document.title) if document.title else None,
             "status_code": document.status_code,
             "fetched_at": document.fetched_at.isoformat(),
             "content_hash": document.content_hash,
             "metadata_json": document.metadata_json,
             "preview": preview,
-            "truncated": len(document.raw_markdown) > max_chars,
+            "truncated": len(raw) > max_chars,
         }
         if include_markdown:
             payload["raw_markdown"] = preview

@@ -1,10 +1,22 @@
 from __future__ import annotations
 
+import re
+
 from sqlmodel import Session
 
 from app.db.models import Chunk, Document
 from app.services.embeddings import EmbeddingService
 from app.services.vector_store import VectorStore
+
+_INVISIBLE_RE = re.compile(r"[\u200b\u200c\u200d\u200e\u200f\u00ad\u00a0\u2028\u2029\ufeff\u2060]+")
+_MULTISPACE_RE = re.compile(r"\s{2,}")
+
+
+def _clean_snippet(text: str) -> str:
+    """Remove invisible Unicode and collapse whitespace."""
+    text = _INVISIBLE_RE.sub("", text)
+    text = _MULTISPACE_RE.sub(" ", text)
+    return text.strip()
 
 
 class SearchService:
@@ -31,7 +43,7 @@ class SearchService:
                         "url": document.url,
                         "title": document.title,
                         "score": item["score"],
-                        "snippet": chunk.text[:320],
+                        "snippet": _clean_snippet(chunk.text[:320]),
                         "chunk_index": chunk.chunk_index,
                     }
                 )
