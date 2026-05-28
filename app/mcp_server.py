@@ -586,6 +586,9 @@ def create_mcp_server(lazy_container: LazyMCPContainer) -> FastMCP:
 def run() -> None:
     """Run the MCP server with daemon lock and lazy initialization."""
     setup_logging()
+
+    __warmup_embedding_model()
+
     logger.info("Starting crawl-index MCP server...")
 
     # Try to acquire daemon lock with short timeout
@@ -608,6 +611,7 @@ def run() -> None:
         # Create and run server - stdio starts IMMEDIATELY
         mcp_server = create_mcp_server(lazy_container)
 
+        print("MCP server ready", file=sys.stderr)
         logger.info("MCP server ready (stdio transport, lazy init)")
         mcp_server.run(transport="stdio")
 
@@ -616,6 +620,28 @@ def run() -> None:
         sys.exit(1)
     finally:
         daemon_lock.release()
+
+
+def __warmup_embedding_model() -> None:
+    """Ensure embedding model is downloaded before MCP starts."""
+    from app.services.embeddings import EmbeddingService
+    from app.services.vector_store import VectorStore
+
+    model_name = get_settings().embedding_model
+    print(f"\nDownloading embedding model: {model_name}", file=sys.stderr)
+    print("This may take a few minutes on first run (~500MB)...\n", file=sys.stderr)
+
+    try:
+        vs = VectorStore(get_settings())
+        VectorStore.lock_manager = property(lambda self: None)  # bypass lock for warmup
+        es = EmbeddingService(get_settings(), vs)
+        es.embed_texts(["warmup"])
+        vs.close()
+        print(f"\nEmbedding model ready: {model_name}\n", file=sys.stderr)
+    except Exception as e:
+        print(f"\nERROR: Failed to load embedding model: {e}", file=sys.stderr)
+        print("Check your internet connection and try again.", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
