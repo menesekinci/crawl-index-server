@@ -81,32 +81,51 @@ class CloudflareCrawlClient:
             f"https://api.cloudflare.com/client/v4/accounts/"
             f"{self._settings.cf_account_id}/browser-rendering/crawl/{provider_job_id}"
         )
+        all_records: list[CrawlRecord] = []
+        total = 0
+        finished = 0
+        skipped = 0
+        status = "unknown"
+        job_id = ""
+        cursor: str | None = None
+
         with httpx.Client(timeout=30.0) as client:
-            response = client.get(endpoint, headers=self._headers())
-            response.raise_for_status()
-            data = response.json()
-        if not data.get("success"):
-            raise RuntimeError(str(data.get("errors") or data))
-        result = data["result"]
-        records = []
-        for record in result.get("records", []):
-            metadata = record.get("metadata") or {}
-            records.append(
-                CrawlRecord(
-                    url=record.get("url", ""),
-                    status=record.get("status", ""),
-                    title=metadata.get("title"),
-                    status_code=metadata.get("status"),
-                    markdown=record.get("markdown") or record.get("html") or record.get("json") or "",
-                    metadata=metadata,
-                )
-            )
+            while True:
+                params: dict[str, str] = {}
+                if cursor:
+                    params["cursor"] = cursor
+                response = client.get(endpoint, headers=self._headers(), params=params)
+                response.raise_for_status()
+                data = response.json()
+                if not data.get("success"):
+                    raise RuntimeError(str(data.get("errors") or data))
+                result = data["result"]
+                job_id = result["id"]
+                status = result.get("status", "unknown")
+                total = result.get("total", 0)
+                finished = result.get("finished", 0)
+                skipped += result.get("skipped", 0)
+                for record in result.get("records", []):
+                    metadata = record.get("metadata") or {}
+                    all_records.append(
+                        CrawlRecord(
+                            url=record.get("url", ""),
+                            status=record.get("status", ""),
+                            title=metadata.get("title"),
+                            status_code=metadata.get("status"),
+                            markdown=record.get("markdown") or record.get("html") or record.get("json") or "",
+                            metadata=metadata,
+                        )
+                    )
+                cursor = result.get("cursor")
+                if not cursor:
+                    break
         return CrawlJobResult(
-            id=result["id"],
-            status=result.get("status", "unknown"),
-            total=result.get("total", 0),
-            finished=result.get("finished", 0),
-            skipped=result.get("skipped", 0),
-            records=records,
+            id=job_id,
+            status=status,
+            total=total,
+            finished=finished,
+            skipped=skipped,
+            records=all_records,
         )
 
