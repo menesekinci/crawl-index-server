@@ -59,7 +59,7 @@ CF_API_TOKEN=your_api_token
 APP_HOST=127.0.0.1
 APP_PORT=8000
 QDRANT_URL=http://127.0.0.1:6333
-EMBEDDING_MODEL=google/embeddinggemma-300m
+EMBEDDING_MODEL=intfloat/multilingual-e5-base
 ```
 
 > ⚠️ Without Cloudflare credentials, crawl is disabled but search and admin UI still work.
@@ -93,8 +93,6 @@ Full-featured MCP server for AI agents!
   }
 }
 ```
-
-> 💡 On first launch, the embedding model (~600MB) downloads automatically. Since the model is gated, a HuggingFace token is required: `uv run huggingface-cli login`
 
 ### Available Tools
 
@@ -177,7 +175,7 @@ result = reindex_source(source_id="abc-123")
 |-------|------------|
 | 🌐 API | FastAPI + Uvicorn |
 | 📊 Database | SQLite + SQLModel |
-| 🧠 Embeddings | sentence-transformers (Google EmbeddingGemma 300M) |
+| 🧠 Embeddings | sentence-transformers (multilingual-e5-base, 768 dims) |
 | 🔍 Vector Store | Qdrant |
 | 📝 UI | Jinja2 Templates |
 | 🤖 AI Integration | MCP (Model Context Protocol) |

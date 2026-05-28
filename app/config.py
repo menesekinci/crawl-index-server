@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     qdrant_url: str | None = (
         None  # If set, use HTTP transport (e.g., "http://127.0.0.1:6333")
     )
-    embedding_model: str = "google/embeddinggemma-300m"
+    embedding_model: str = "intfloat/multilingual-e5-base"
     embedding_cache_dir: str = ".data/models"
     cf_account_id: str | None = None
     cf_api_token: str | None = None
