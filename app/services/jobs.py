@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import threading
 from datetime import datetime
 from uuid import uuid4
 
@@ -256,7 +257,12 @@ class CrawlCoordinator:
                     session.add(source)
                 session.commit()
                 if changed_documents:
-                    self._index_documents(changed_documents)
+                    threading.Thread(
+                        target=self._index_documents,
+                        args=(changed_documents,),
+                        name=f"index-{job_id[:8]}",
+                        daemon=True,
+                    ).start()
             elif result.status in {"failed", "error", "errored"}:
                 job.status = JobStatus.failed.value
                 job.finished_at = utcnow()
@@ -307,7 +313,12 @@ class CrawlCoordinator:
                             session.add(source)
                         session.commit()
                         if changed_documents:
-                            self._index_documents(changed_documents)
+                            threading.Thread(
+                                target=self._index_documents,
+                                args=(changed_documents,),
+                                name=f"timeout-index-{job_id[:8]}",
+                                daemon=True,
+                            ).start()
                     else:
                         job.status = JobStatus.failed.value
                         job.finished_at = utcnow()
