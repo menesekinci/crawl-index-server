@@ -288,9 +288,15 @@ def start_ui_browser_thread(settings: Settings) -> None:
     import threading
 
     url = get_admin_ui_url(settings)
+
+    def _retry_until_open():
+        while True:
+            if wait_for_ui_ready_and_open(url):
+                return
+            time.sleep(10)
+
     thread = threading.Thread(
-        target=wait_for_ui_ready_and_open,
-        kwargs={"url": url},
+        target=_retry_until_open,
         name="crawl-index-ui-open",
         daemon=True,
     )
