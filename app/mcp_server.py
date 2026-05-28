@@ -544,6 +544,7 @@ def create_mcp_server(lazy_container: LazyMCPContainer) -> FastMCP:
             "dashboard_url": f"{base_url}/admin/sources",
             "settings_url": f"{base_url}/admin/settings",
             "capabilities": "Users can visually manage sources, track crawl jobs in real-time, configure Cloudflare API tokens, and perform semantic searches.",
+            "note": "On first launch, the embedding model (multilingual-e5-small, ~500MB) downloads in the background. The Web UI will open automatically once the server is ready — this may take a few minutes. Crawl jobs complete independently and are automatically embedded and indexed — no manual action needed.",
         }
 
     @mcp.tool()
