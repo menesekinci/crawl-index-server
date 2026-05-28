@@ -187,7 +187,8 @@ class CrawlCoordinator:
             logger.info(f"Retrying job {job_id}")
         return self.submit_job(job_id)
 
-    def poll_active_jobs(self) -> None:
+    def poll_active_jobs(self) -> dict[str, str]:
+        errors: dict[str, str] = {}
         with Session(self._engine) as session:
             jobs = list(
                 session.exec(
@@ -202,7 +203,9 @@ class CrawlCoordinator:
             try:
                 self._poll_single_job(job.id)
             except Exception as e:
+                errors[job.id] = str(e)
                 logger.error(f"Error polling job {job.id}: {e}")
+        return errors
 
     def _poll_single_job(self, job_id: str) -> None:
         with Session(self._engine) as session:
@@ -261,15 +264,11 @@ class CrawlCoordinator:
             else:
                 # Job still running - check for timeout
                 timeout_minutes = self._settings.job_timeout_minutes
-                started = job.started_at
+                started = job.started_at or job.submitted_at or job.created_at
                 if started and started.tzinfo is None:
                     from datetime import timezone as _tz
                     started = started.replace(tzinfo=_tz.utc)
-                elapsed = (
-                    (utcnow() - started).total_seconds() / 60
-                    if started
-                    else 0
-                )
+                elapsed = (utcnow() - started).total_seconds() / 60
 
                 if elapsed > timeout_minutes:
                     logger.warning(

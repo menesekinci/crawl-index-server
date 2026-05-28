@@ -21,18 +21,42 @@ logger = logging.getLogger(__name__)
 @dataclass
 class MCPContainer:
     services: ServiceContainer
+    _last_poll_errors: dict[str, str] = None
 
-    def refresh_jobs(self) -> None:
+    def __post_init__(self):
+        self._last_poll_errors = {}
+
+    def refresh_jobs(self) -> dict[str, str]:
         try:
-            self.services.crawl_coordinator.poll_active_jobs()
+            self._last_poll_errors = self.services.crawl_coordinator.poll_active_jobs()
+            return self._last_poll_errors
         except Exception as e:
             logger.warning(f"refresh_jobs failed: {e}")
+            return {"_refresh": str(e)}
 
-    def health_check(self) -> dict[str, bool]:
-        """Check health of all services."""
-        return {
+    def health_check(self) -> dict[str, Any]:
+        """Check health of all services including doc and chunk counts."""
+        result: dict[str, Any] = {
             "vector_store": self.services.vector_store.health_check(),
         }
+        try:
+            from sqlmodel import Session, select, func
+            from app.db.models import Document, Chunk, CrawlJob, JobStatus
+            engine = self.services.source_service._engine
+            with Session(engine) as session:
+                result["documents"] = session.exec(select(func.count(Document.id))).one()
+                result["chunks"] = session.exec(select(func.count(Chunk.id))).one()
+                result["active_jobs"] = session.exec(
+                    select(func.count(CrawlJob.id)).where(
+                        CrawlJob.status.in_([JobStatus.polling.value, JobStatus.submitted.value])
+                    )
+                ).one()
+                result["stalled_jobs"] = session.exec(
+                    select(func.count(CrawlJob.id)).where(CrawlJob.status == JobStatus.polling.value)
+                ).one()
+        except Exception as e:
+            result["db_stats_error"] = str(e)
+        return result
 
     def close(self) -> None:
         self.services.close()
@@ -123,12 +147,13 @@ class CrawlIndexMCPAdapter:
     def _get_container(self) -> MCPContainer:
         return self._lazy.get()
 
-    def _poll_before_read(self) -> None:
-        """Poll active jobs with error handling."""
+    def _poll_before_read(self) -> dict[str, str]:
+        """Poll active jobs with error handling. Returns error dict."""
         try:
-            self._get_container().refresh_jobs()
+            return self._get_container().refresh_jobs()
         except Exception as e:
             logger.warning(f"Poll before read failed: {e}")
+            return {}
 
     def _health_check(self) -> dict[str, bool]:
         """Get health status of all services."""
@@ -145,6 +170,13 @@ class CrawlIndexMCPAdapter:
             self._poll_before_read()
             services = self._get_container().services
             sources = services.source_service.list_sources(enabled_only=enabled_only)
+            from sqlmodel import Session, select, func
+            from app.db.models import Document
+            engine = services.source_service._engine
+            with Session(engine) as session:
+                doc_counts = dict(session.exec(
+                    select(Document.source_id, func.count(Document.id)).group_by(Document.source_id)
+                ).all())
             return {
                 "sources": [
                     {
@@ -159,6 +191,7 @@ class CrawlIndexMCPAdapter:
                         "last_success_at": self._iso(source.last_success_at)
                         if source.last_success_at
                         else None,
+                        "document_count": doc_counts.get(source.id, 0),
                     }
                     for source in sources
                 ]
@@ -219,7 +252,7 @@ class CrawlIndexMCPAdapter:
         limit: int = 20,
     ) -> dict[str, Any]:
         try:
-            self._poll_before_read()
+            poll_errors = self._poll_before_read()
             services = self._get_container().services
             jobs = services.crawl_coordinator.list_jobs(
                 source_id=source_id,
@@ -247,9 +280,13 @@ class CrawlIndexMCPAdapter:
                         "finished_at": self._iso(job.finished_at)
                         if job.finished_at
                         else None,
+                        "last_polled_at": self._iso(job.updated_at)
+                        if job.updated_at
+                        else None,
                     }
                     for job in jobs
-                ]
+                ],
+                "poll_errors": poll_errors,
             }
         except Exception as e:
             logger.error(f"list_jobs failed: {e}")
@@ -281,6 +318,7 @@ class CrawlIndexMCPAdapter:
                 else None,
                 "started_at": self._iso(job.started_at) if job.started_at else None,
                 "finished_at": self._iso(job.finished_at) if job.finished_at else None,
+                "last_polled_at": self._iso(job.updated_at) if job.updated_at else None,
             }
         except Exception as e:
             logger.error(f"get_job failed: {e}")
