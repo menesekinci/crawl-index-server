@@ -59,7 +59,7 @@ CF_API_TOKEN=your_api_token
 APP_HOST=127.0.0.1
 APP_PORT=8000
 QDRANT_URL=http://127.0.0.1:6333
-EMBEDDING_MODEL=intfloat/multilingual-e5-small
+EMBEDDING_MODEL=google/embeddinggemma-300m
 ```
 
 > ⚠️ Cloudflare olmadan crawl çalışmaz ama arama ve yönetim paneline erişebilirsin.
@@ -77,25 +77,30 @@ AI ajanları için tam teşekküllü MCP server!
   "mcpServers": {
     "crawl-index": {
       "command": "uv",
-      "args": ["--directory", "/path/to/crawl-index-server", "run", "python", "-m", "app.mcp_server"]
+      "args": ["--directory", "/path/to/crawl-index-server", "run", "crawl-index-mcp"]
     }
   }
 }
 ```
+
+> 💡 İlk başlatmada embedding modeli (~600MB) otomatik indirilir. Model gated olduğu için HuggingFace token gerekir: `uv run huggingface-cli login`
 
 ### Kullanılabilir Tool'lar
 
 | Tool | Açıklama |
 |------|----------|
 | `search_docs` | 📚 Indexed dokümanlarda semantik arama |
-| `list_sources` | 📋 Tüm crawl kaynaklarını listele |
+| `list_sources` | 📋 Tüm crawl kaynaklarını listele (+ doküman sayısı) |
 | `create_source` | ➕ Yeni kaynak ekle |
 | `trigger_crawl` | ▶️ Crawl başlat |
 | `reindex_source` | 🔄 Kaynağı yeniden indeksle |
-| `list_jobs` | 📊 Crawl işlerini görüntüle |
-| `get_job` | 🔎 İş detaylarını al |
+| `list_jobs` | 📊 Crawl işlerini görüntüle (+ poll hataları) |
+| `get_job` | 🔎 İş detaylarını al (+ son poll zamanı) |
 | `retry_job` | 🔁 Başarısız işi yeniden dene |
-| `health_check` | 💚 Sistem sağlığını kontrol et |
+| `list_documents` | 📄 İndekslenen dokümanları listele |
+| `get_document` | 📝 Doküman içeriğini getir |
+| `get_web_ui_info` | 🌐 Web UI adresi ve bilgisi |
+| `health_check` | 💚 Sistem sağlığı (vektör store, doc/chunk sayısı, aktif işler) |
 
 ### Örnek Kullanım
 
@@ -161,7 +166,7 @@ result = reindex_source(source_id="abc-123")
 |--------|-----------|
 | 🌐 API | FastAPI + Uvicorn |
 | 📊 Database | SQLite + SQLModel |
-| 🧠 Embeddings | sentence-transformers |
+| 🧠 Embeddings | sentence-transformers (Google EmbeddingGemma 300M) |
 | 🔍 Vector Store | Qdrant |
 | 📝 UI | Jinja2 Templates |
 | 🤖 AI Integration | MCP (Model Context Protocol) |

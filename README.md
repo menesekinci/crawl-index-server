@@ -59,7 +59,7 @@ CF_API_TOKEN=your_api_token
 APP_HOST=127.0.0.1
 APP_PORT=8000
 QDRANT_URL=http://127.0.0.1:6333
-EMBEDDING_MODEL=intfloat/multilingual-e5-small
+EMBEDDING_MODEL=google/embeddinggemma-300m
 ```
 
 > ⚠️ Without Cloudflare credentials, crawl is disabled but search and admin UI still work.
@@ -77,25 +77,30 @@ Full-featured MCP server for AI agents!
   "mcpServers": {
     "crawl-index": {
       "command": "uv",
-      "args": ["--directory", "/path/to/crawl-index-server", "run", "python", "-m", "app.mcp_server"]
+      "args": ["--directory", "/path/to/crawl-index-server", "run", "crawl-index-mcp"]
     }
   }
 }
 ```
+
+> 💡 On first launch, the embedding model (~600MB) downloads automatically. Since the model is gated, a HuggingFace token is required: `uv run huggingface-cli login`
 
 ### Available Tools
 
 | Tool | Description |
 |------|-------------|
 | `search_docs` | 📚 Semantic search in indexed documents |
-| `list_sources` | 📋 List all crawl sources |
+| `list_sources` | 📋 List all crawl sources (+ document count) |
 | `create_source` | ➕ Add new source |
 | `trigger_crawl` | ▶️ Start crawl |
 | `reindex_source` | 🔄 Re-index a source |
-| `list_jobs` | 📊 View crawl jobs |
-| `get_job` | 🔎 Get job details |
+| `list_jobs` | 📊 View crawl jobs (+ poll errors) |
+| `get_job` | 🔎 Get job details (+ last poll time) |
 | `retry_job` | 🔁 Retry failed job |
-| `health_check` | 💚 Check system health |
+| `list_documents` | 📄 List indexed documents |
+| `get_document` | 📝 Get document content |
+| `get_web_ui_info` | 🌐 Web UI URL and info |
+| `health_check` | 💚 System health (vector store, doc/chunk count, active jobs) |
 
 ### Example Usage
 
@@ -161,7 +166,7 @@ result = reindex_source(source_id="abc-123")
 |-------|------------|
 | 🌐 API | FastAPI + Uvicorn |
 | 📊 Database | SQLite + SQLModel |
-| 🧠 Embeddings | sentence-transformers |
+| 🧠 Embeddings | sentence-transformers (Google EmbeddingGemma 300M) |
 | 🔍 Vector Store | Qdrant |
 | 📝 UI | Jinja2 Templates |
 | 🤖 AI Integration | MCP (Model Context Protocol) |
