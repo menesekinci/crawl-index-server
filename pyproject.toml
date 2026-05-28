@@ -15,7 +15,7 @@ dependencies = [
     "python-dotenv>=1.0.1,<2",
     "python-multipart>=0.0.20,<1",
     "qdrant-client>=1.7.0,<1.8",
-    "sentence-transformers>=3.3.1,<4",
+    "sentence-transformers>=3.3.1,<6",
     "sqlmodel>=0.0.22,<0.1",
     "uvicorn[standard]>=0.32.0,<1",
 ]

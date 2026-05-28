@@ -624,19 +624,21 @@ def run() -> None:
 
 def __warmup_embedding_model() -> None:
     """Ensure embedding model is downloaded before MCP starts."""
-    from app.services.embeddings import EmbeddingService
-    from app.services.vector_store import VectorStore
+    from sentence_transformers import SentenceTransformer
 
     model_name = get_settings().embedding_model
     print(f"\nDownloading embedding model: {model_name}", file=sys.stderr)
-    print("This may take a few minutes on first run (~500MB)...\n", file=sys.stderr)
+    print("This may take a few minutes on first run (~600MB)...\n", file=sys.stderr)
 
     try:
-        vs = VectorStore(get_settings())
-        VectorStore.lock_manager = property(lambda self: None)  # bypass lock for warmup
-        es = EmbeddingService(get_settings(), vs)
-        es.embed_texts(["warmup"])
-        vs.close()
+        model = SentenceTransformer(
+            model_name,
+            cache_folder=str(get_settings().embedding_cache_path),
+        )
+        if hasattr(model, "encode_document"):
+            model.encode_document(["warmup"])
+        else:
+            model.encode(["warmup"])
         print(f"\nEmbedding model ready: {model_name}\n", file=sys.stderr)
     except Exception as e:
         print(f"\nERROR: Failed to load embedding model: {e}", file=sys.stderr)
