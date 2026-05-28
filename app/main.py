@@ -26,8 +26,8 @@ from app.workers.scheduler import AppScheduler
 
 logger = logging.getLogger(__name__)
 
-UI_READY_TIMEOUT_SECONDS = 15.0
-UI_READY_POLL_INTERVAL_SECONDS = 0.25
+UI_READY_TIMEOUT_SECONDS = 60.0
+UI_READY_POLL_INTERVAL_SECONDS = 0.5
 
 
 @dataclass
@@ -262,17 +262,25 @@ def wait_for_ui_ready_and_open(
     sleep = sleep or time.sleep
     monotonic = monotonic or time.monotonic
 
+    logger.info(f"Waiting for UI to become ready at {url} (timeout: {timeout_seconds}s)...")
     deadline = monotonic() + timeout_seconds
     while monotonic() < deadline:
         try:
             with urlopen(url, timeout=1.0) as response:
                 status_code = getattr(response, "status", 200)
             if status_code < 500:
-                open_browser(url)
+                try:
+                    open_browser(url)
+                    logger.info(f"Browser opened at {url}")
+                except Exception as exc:
+                    logger.warning(f"Could not open browser automatically: {exc}")
+                    print(f"Admin UI: {url}")
                 return True
         except (urllib.error.URLError, TimeoutError, OSError, ValueError):
             pass
         sleep(poll_interval_seconds)
+    logger.warning(f"UI did not become ready within {timeout_seconds}s")
+    print(f"Admin UI (open manually): {url}")
     return False
 
 
