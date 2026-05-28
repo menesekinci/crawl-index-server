@@ -64,6 +64,17 @@ EMBEDDING_MODEL=google/embeddinggemma-300m
 
 > ⚠️ Cloudflare olmadan crawl çalışmaz ama arama ve yönetim paneline erişebilirsin.
 
+### Cloudflare Plan Limitleri
+
+| Limit | Free Plan | Paid Plan |
+|-------|-----------|-----------|
+| Browser süresi | 10 dk/gün | 10 saat/ay (sonrası $0.09/saat) |
+| Crawl job/gün | 5 | Sınırsız |
+| Sayfa/job | 100 | 100 |
+| İstek hızı | 1/10sn | 10/sn |
+
+> 💡 **Paid plan** (~$5/ay Workers Paid) crawl işlemleri için yeterli. 10 saat = yüzlerce sayfa crawl.
+
 ---
 
 ## 🤖 MCP Server

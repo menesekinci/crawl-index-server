@@ -64,6 +64,17 @@ EMBEDDING_MODEL=google/embeddinggemma-300m
 
 > ⚠️ Without Cloudflare credentials, crawl is disabled but search and admin UI still work.
 
+### Cloudflare Plan Limits
+
+| Limit | Free Plan | Paid Plan |
+|-------|-----------|-----------|
+| Browser time | 10 min/day | 10 hours/month (then $0.09/hour) |
+| Crawl jobs/day | 5 | Unlimited |
+| Pages/job | 100 | 100 |
+| Request rate | 1/10s | 10/s |
+
+> 💡 **Paid plan** (~$5/month Workers Paid) is sufficient for crawl operations. 10 hours = hundreds of pages crawled.
+
 ---
 
 ## 🤖 MCP Server
