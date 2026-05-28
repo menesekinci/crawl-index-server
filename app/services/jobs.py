@@ -251,7 +251,7 @@ class CrawlCoordinator:
                 session.commit()
                 if changed_documents:
                     self._index_documents(changed_documents)
-            elif result.status in {"failed", "error"}:
+            elif result.status in {"failed", "error", "errored"}:
                 job.status = JobStatus.failed.value
                 job.finished_at = utcnow()
                 job.error_text = f"Provider reported status={result.status}"
@@ -261,9 +261,13 @@ class CrawlCoordinator:
             else:
                 # Job still running - check for timeout
                 timeout_minutes = self._settings.job_timeout_minutes
+                started = job.started_at
+                if started and started.tzinfo is None:
+                    from datetime import timezone as _tz
+                    started = started.replace(tzinfo=_tz.utc)
                 elapsed = (
-                    (utcnow() - job.started_at).total_seconds() / 60
-                    if job.started_at
+                    (utcnow() - started).total_seconds() / 60
+                    if started
                     else 0
                 )
 

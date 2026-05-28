@@ -29,15 +29,9 @@ class QdrantLockManager:
     """
 
     def __init__(self, lock_dir: Path):
-        """
-        Initialize the lock manager.
-
-        Args:
-            lock_dir: Directory where lock file will be created
-        """
         self.lock_dir = Path(lock_dir)
         self.lock_file = self.lock_dir / LOCK_FILE_NAME
-        self._lock_fd: Optional[int] = None
+        self._lock_file_obj = None
         self._owns_lock = False
 
     def _ensure_lock_dir(self) -> None:
@@ -127,32 +121,24 @@ class QdrantLockManager:
 
         while True:
             try:
-                # Open lock file (create if doesn't exist)
-                self._lock_fd = os.open(
-                    str(self.lock_file),
-                    os.O_CREAT | os.O_RDWR,
-                )
-
-                # Try to acquire exclusive lock (non-blocking first)
+                self._lock_file_obj = open(self.lock_file, "a+")
                 portalocker.lock(
-                    self._lock_fd,
+                    self._lock_file_obj,
                     portalocker.LOCK_EX | portalocker.LOCK_NB,
                 )
 
-                # Success! Write our info
                 self._write_lock_info()
                 self._owns_lock = True
                 logger.debug(f"Acquired Qdrant lock (pid={os.getpid()})")
                 return True
 
             except portalocker.AlreadyLocked:
-                # Another process holds the lock
-                if self._lock_fd is not None:
+                if self._lock_file_obj is not None:
                     try:
-                        os.close(self._lock_fd)
+                        self._lock_file_obj.close()
                     except OSError:
                         pass
-                    self._lock_fd = None
+                    self._lock_file_obj = None
 
                 # Check if we've timed out
                 elapsed = time.time() - start_time
@@ -167,28 +153,27 @@ class QdrantLockManager:
 
             except OSError as e:
                 logger.error(f"OS error while acquiring lock: {e}")
-                if self._lock_fd is not None:
+                if self._lock_file_obj is not None:
                     try:
-                        os.close(self._lock_fd)
+                        self._lock_file_obj.close()
                     except OSError:
                         pass
-                    self._lock_fd = None
+                    self._lock_file_obj = None
                 raise QdrantLockError(f"Failed to acquire lock: {e}") from e
 
     def release(self) -> None:
-        """Release the lock if we own it."""
-        if self._owns_lock and self._lock_fd is not None:
+        if self._owns_lock and self._lock_file_obj is not None:
             try:
                 portalocker.lock(
-                    self._lock_fd,
+                    self._lock_file_obj,
                     portalocker.LOCK_UN,
                 )
-                os.close(self._lock_fd)
+                self._lock_file_obj.close()
                 logger.debug(f"Released Qdrant lock (pid={os.getpid()})")
             except OSError as e:
                 logger.error(f"Error releasing lock: {e}")
             finally:
-                self._lock_fd = None
+                self._lock_file_obj = None
                 self._owns_lock = False
 
     def is_locked(self) -> bool:
